@@ -46,14 +46,39 @@ KEEP = {
     "prosecutor": 2, "seizure": 2, "seized": 2, "customs": 2, "port": 1,
     "police officer": 3, "sanctioned": 2, "ofac": 3, "asset forfeiture": 3,
     "state capture": 4, "protection racket": 3, "junket": 3, "shell company": 2,
+    "officer": 2, "official": 2, "arrested": 2, "charged": 2, "raid": 2, "port": 1,
+    "minister": 2, "judge": 2, "general": 1, "customs officer": 2, "complicity": 2,
 }
 DROP = [
     "football", "soccer", "premier league", "nba", "nfl", "cricket score", "box office",
     "recipe", "horoscope", "celebrity", "fashion week", "transfer window", "how to watch",
     "coupon", "discount code", "stock forecast", "price prediction", "casino bonus",
-    "review: ", "obituary", "weather forecast",
+    "review: ", "obituary", "weather forecast", "opinion:", "editorial:", "podcast",
+    "what to know", "live updates", "explainer", "best of", "gift guide", "streaming",
+    "drug store", "drugstore", "pharmacy hours", "weight loss drug", "cancer drug",
+    "drug trial", "clinical trial", "fda approves", "prescription costs", "war on drugs review",
+    "drug shortage", "generic drug", "drugmaker", "pharma stock", "share price",
 ]
-MIN_SIG = 3
+MIN_SIG = 6
+
+# An item must carry BOTH an illicit-economy anchor and an institutional/enforcement term.
+# Keyword weight alone let through anything that merely used the vocabulary — a corruption
+# story with no drug angle, a drug-possession arrest with no institution in it.
+ANCHOR = [
+    "cartel", "narco", "trafficking", "traffick", "cocaine", "heroin", "fentanyl",
+    "methamphetamine", "meth ", "captagon", "opium", "opioid", "precursor", "drug ring",
+    "drug network", "drug gang", "drug trade", "drug lord", "money laundering",
+    "laundering", "organised crime", "organized crime", "mafia", "kingpin", "smuggling ring",
+]
+INSTITUTION = [
+    "official", "officer", "police", "customs", "minister", "mayor", "governor", "senator",
+    "congress", "judge", "prosecutor", "magistrate", "general", "colonel", "army", "navy",
+    "border guard", "bank", "banker", "regulator", "port", "airport", "company", "firm",
+    "executive", "lawyer", "notary", "casino", "exchange", "indicted", "indictment",
+    "convicted", "conviction", "sentenced", "pleaded guilty", "charged", "arrested",
+    "extradited", "sanctioned", "ofac", "fined", "penalty", "raid", "seized", "forfeiture",
+    "investigation", "corruption", "bribe", "bribery", "complicity", "protection",
+]
 
 # ------------------------------------------------------- geo tagging (ISO3 map)
 COUNTRIES = {
@@ -221,6 +246,10 @@ def signal(text):
     for d in DROP:
         if d in low:
             return 0
+    if not any(a in low for a in ANCHOR):
+        return 0
+    if not any(i in low for i in INSTITUTION):
+        return 0
     s = 0
     for k, w in KEEP.items():
         if k in low:
