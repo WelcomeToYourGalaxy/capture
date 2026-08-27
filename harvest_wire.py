@@ -48,6 +48,22 @@ KEEP = {
     "state capture": 4, "protection racket": 3, "junket": 3, "shell company": 2,
     "officer": 2, "official": 2, "arrested": 2, "charged": 2, "raid": 2, "port": 1,
     "minister": 2, "judge": 2, "general": 1, "customs officer": 2, "complicity": 2,
+    # Non-English weights. Without these the anchor and institution gates would pass a
+    # Spanish or Russian item and the English-only score table would then bury it under
+    # MIN_SIG — the multilingual searches would have returned nothing usable.
+    "narcotráfico": 4, "narcotrafico": 4, "cártel": 4, "lavado de dinero": 4, "blanqueo": 3,
+    "funcionario": 2, "aduana": 2, "detenido": 2, "condenado": 2, "policía": 2, "soborno": 3,
+    "trafic de drogue": 4, "blanchiment": 4, "stupéfiants": 3, "banquier": 2, "douane": 2,
+    "mis en examen": 2, "corruption policière": 3,
+    "lavagem de dinheiro": 4, "tráfico": 3, "apreensão": 2, "delegado": 2,
+    "drogenhandel": 4, "geldwäsche": 4, "beamter": 2, "zoll": 2, "verhaftet": 2,
+    "traffico di droga": 4, "riciclaggio": 4, "funzionario": 2, "dogana": 2, "arrestato": 2,
+    "drugshandel": 4, "witwassen": 4, "ambtenaar": 2, "aangehouden": 2,
+    "наркотраф": 4, "отмывание": 4, "чиновник": 2, "таможн": 2, "задержан": 2, "взятк": 3,
+    "مخدرات": 4, "كبتاجون": 4, "تهريب": 3, "ضابط": 2, "شرطة": 2, "رشوة": 3,
+    "uyuşturucu": 4, "kaçakçılık": 3, "rüşvet": 3, "gümrük": 2, "gözaltına": 2,
+    "narkoba": 4, "korupsi": 3, "bea cukai": 2, "ditangkap": 2,
+    "dawa za kulevya": 4, "rushwa": 3, "polisi": 2,
 }
 DROP = [
     "football", "soccer", "premier league", "nba", "nfl", "cricket score", "box office",
@@ -58,6 +74,11 @@ DROP = [
     "drug store", "drugstore", "pharmacy hours", "weight loss drug", "cancer drug",
     "drug trial", "clinical trial", "fda approves", "prescription costs", "war on drugs review",
     "drug shortage", "generic drug", "drugmaker", "pharma stock", "share price",
+    # the failure modes that actually showed up in the feed
+    "health care fraud", "healthcare fraud", "medicare", "medicaid", "excessive force",
+    "civil rights violation", "ponzi", "insider trading", "identity theft", "tax fraud",
+    "unemployment fraud", "ppp loan", "child support", "counterfeit airbags",
+    "wire fraud scheme", "securities fraud", "bank robbery", "carjacking",
 ]
 MIN_SIG = 6
 
@@ -65,12 +86,35 @@ MIN_SIG = 6
 # Keyword weight alone let through anything that merely used the vocabulary — a corruption
 # story with no drug angle, a drug-possession arrest with no institution in it.
 ANCHOR = [
+    # English
     "cartel", "narco", "trafficking", "traffick", "cocaine", "heroin", "fentanyl",
     "methamphetamine", "meth ", "captagon", "opium", "opioid", "precursor", "drug ring",
     "drug network", "drug gang", "drug trade", "drug lord", "money laundering",
     "laundering", "organised crime", "organized crime", "mafia", "kingpin", "smuggling ring",
+    # es / pt
+    "cártel", "cartel de", "narcotráfico", "narcotrafico", "tráfico de drogas",
+    "tráfico de droga", "blanqueo", "lavado de dinero", "lavagem de dinheiro", "cocaína",
+    "cocaina", "estupefaciente",
+    # fr
+    "trafic de drogue", "trafic de stupéfiants", "blanchiment", "stupéfiants",
+    # de / nl / it
+    "drogenhandel", "geldwäsche", "kokain", "drugshandel", "witwassen",
+    "traffico di droga", "riciclaggio",
+    # ru / ar / tr / id / sw
+    "наркотик", "наркотраф", "отмывание", "мхдр", "مخدرات", "كبتاجون", "تهريب",
+    "uyuşturucu", "kaçakçılık", "narkoba", "dawa za kulevya",
 ]
 INSTITUTION = [
+    # non-English institutional terms, so the gate does not silently drop every
+    # non-English item the multilingual searches bring in
+    "funcionario", "policía", "policia", "aduana", "aduanero", "fiscal", "juez", "ministro",
+    "banco", "puerto", "detenido", "condenado", "imputado", "alfândega", "delegado",
+    "douane", "procureur", "juge", "ministre", "banque", "gendarme", "magistrat", "banquier",
+    "beamter", "beamten", "staatsanwalt", "zoll", "hafen", "polizei", "bankier",
+    "funzionario", "procura", "dogana", "porto", "poliziotto", "banca",
+    "ambtenaar", "haven", "полиц", "таможн", "прокур", "чиновник", "банк",
+    "ضابط", "شرطة", "جمارك", "بنك", "polis", "gümrük", "savcı", "banka", "memur",
+    "pejabat", "polisi", "bea cukai", "afisa", "polisi ya",
     "official", "officer", "police", "customs", "minister", "mayor", "governor", "senator",
     "congress", "judge", "prosecutor", "magistrate", "general", "colonel", "army", "navy",
     "border guard", "bank", "banker", "regulator", "port", "airport", "company", "firm",

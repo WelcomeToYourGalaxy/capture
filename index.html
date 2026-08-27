@@ -616,6 +616,13 @@ body.info-open #controls #indexPanel{position:static !important;
   .lens-d{display:block;width:100%;font-size:10.5px;color:#858da0;line-height:1.5;
           text-align:left;hyphens:none;}
   .leg-key{display:flex;align-items:center;gap:7px;font-size:11px;color:#b4bacb;margin:3px 0;}
+  .key-tog{cursor:pointer;padding:2px 4px;border-radius:4px;user-select:none;}
+  .key-tog:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .key-tog.off{color:#6b7285;}
+  .key-tog .kt-l{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .key-tog .kt-n{flex:0 0 auto;font-family:'DejaVu Sans Mono',monospace;font-size:9.5px;color:#7d859a;}
+  .key-h{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--accent-hi);
+         margin:2px 0 4px;}
   .leg-sw{width:16px;height:11px;border-radius:2px;flex:none;}
   #idxList .idx-row{padding:5px 8px;font-size:11.5px;color:#c3c8d6;cursor:pointer;border-radius:5px;
                     display:flex;justify-content:space-between;gap:8px;}
@@ -666,6 +673,7 @@ body.info-open #controls #indexPanel{position:static !important;
       <div id="wireCtl">
         <select id="wireRegion" class="idxSel"><option value="">All regions</option></select>
         <select id="wireIso" class="idxSel"><option value="">All jurisdictions</option></select>
+        <select id="wireLang" class="idxSel"><option value="">All languages</option></select>
         <select id="wireAge" class="idxSel">
           <option value="">Any date</option><option value="2">Last 48h</option>
           <option value="7">Last week</option><option value="30">Last month</option>
@@ -730,6 +738,8 @@ var NOTES = DATA.notes, NOTED = DATA.noted, CNOTES = DATA.cnotes;
 var ROUTES_NOTED = ROUTES.filter(function(r){ return r.note; }).length;
 var NET_ON = {groups:true, routes:true};
 var LENS = 'exp';
+var BAND_ON=[true,true,true,true,true];   /* severe .. minimal */
+var CASE_ON=true;
 var CASE_BY_C = {}; CASES.forEach(function(c){ (CASE_BY_C[c.c]=CASE_BY_C[c.c]||[]).push(c); });
 
 var WORLD_BOUNDS = L.latLngBounds([[-84,-179.5],[84,179.5]]);
@@ -789,10 +799,12 @@ function keyOf(f){
   if(k==='__skip') return null;
   return ROWS[k]?k:null;
 }
+function bandIdx(v){ return v>=7.5?0 : v>=6?1 : v>=4.5?2 : v>=3?3 : 4; }
 function styleC(f){
   var k=keyOf(f);
   if(!k) return {fillColor:'#1a1f30',fillOpacity:0.30,color:'rgba(255,255,255,0.10)',weight:0.5};
-  var v=lensVal(ROWS[k]);
+  var v=lensVal(ROWS[k]), bi=bandIdx(v);
+  if(!BAND_ON[bi]) return {fillColor:'#12172a',fillOpacity:0.10,color:'rgba(255,255,255,0.07)',weight:0.4};
   return {fillColor:shade(v),fillOpacity:0.58,color:'rgba(255,255,255,0.22)',weight:0.6};
 }
 /* ---- dateline repair ----------------------------------------------------------
@@ -881,6 +893,8 @@ fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json')
 /* ---- case dots ---- */
 var caseMarkers=[];
 function drawCaseDots(){
+  caseMarkers.forEach(function(m){ map.removeLayer(m); }); caseMarkers=[]; declClear(0);
+  if(!CASE_ON){ declSoon(); return; }
   CASES.forEach(function(c){
     var col = c.tier==='company' ? '#8fb8c9' : '#e0b088';
     var m=L.circleMarker([c.lat,c.lng],{radius:5,color:'#0b0d16',weight:1.4,
@@ -889,6 +903,7 @@ function drawCaseDots(){
     m.bindTooltip(c.n,{direction:'top',offset:[0,-6]});
     caseMarkers.push(m); declRegister(m,c.lat,c.lng,6,0);
   });
+  declSoon();
 }
 
 var entMarkers=[];
@@ -951,7 +966,7 @@ function renderSectorBox(){
     if(SON[s.k]){ p.style.background=s.accent; p.style.borderColor=s.accent; p.style.color='#0b0d16'; }
     var d=document.createElement('span'); d.className='lens-d'; d.textContent=s.d;
     row.appendChild(p); row.appendChild(d);
-    row.onclick=function(){ SON[s.k]=!SON[s.k]; renderSectorBox(); drawEntities(); buildIndex(); };
+    row.onclick=function(){ SON[s.k]=!SON[s.k]; renderSectorBox(); renderKeys(); drawEntities(); buildIndex(); };
     b.appendChild(row);
   });
 }
@@ -1146,7 +1161,7 @@ function renderNetBox(){
     if(NET_ON[o.k]){ p.style.background=o.accent; p.style.borderColor=o.accent; p.style.color='#0b0d16'; }
     var d=document.createElement('span'); d.className='lens-d'; d.textContent=o.d;
     row.appendChild(p); row.appendChild(d);
-    row.onclick=function(){ NET_ON[o.k]=!NET_ON[o.k]; renderNetBox();
+    row.onclick=function(){ NET_ON[o.k]=!NET_ON[o.k]; renderNetBox(); renderKeys();
       if(o.k==='groups') drawGroups(); else drawRoutes(); };
     b.appendChild(row);
   });
@@ -1261,27 +1276,50 @@ function renderLenses(){
     row.appendChild(p); row.appendChild(d);
     row.onclick=function(){ LENS=L_.k;
       document.documentElement.style.setProperty('--accent',L_.accent);
-      renderLenses(); if(geoLayer) geoLayer.setStyle(styleC); buildIndex(); };
+      renderLenses(); renderKeys(); if(geoLayer) geoLayer.setStyle(styleC); buildIndex(); };
     b.appendChild(row);
   });
 }
+/* Every swatch is a switch. Off is shown by dimming the row and hollowing the swatch, so
+   the key still reads as a key rather than turning into a checkbox list. */
+function keyRow(parent, colour, label, on, round, cb, count){
+  var d=document.createElement('div');
+  d.className='leg-key key-tog'+(on?'':' off');
+  d.innerHTML='<span class="leg-sw" style="'+(on?('background:'+colour):('background:transparent;box-shadow:inset 0 0 0 1.5px '+colour))+
+    (round?';border-radius:50%;width:11px':'')+'"></span><span class="kt-l">'+label+'</span>'+
+    (count!=null?('<span class="kt-n">'+count+'</span>'):'');
+  d.onclick=function(e){ e.stopPropagation(); cb(); };
+  parent.appendChild(d);
+}
 function renderKeys(){
   var b=document.getElementById('legKeys'); b.innerHTML='';
-  BANDS.forEach(function(bd){
-    var d=document.createElement('div'); d.className='leg-key';
-    d.innerHTML='<span class="leg-sw" style="background:'+bd[1]+'"></span>'+bd[0];
-    b.appendChild(d);
+  var counts=[0,0,0,0,0];
+  Object.keys(ROWS).forEach(function(k){ counts[bandIdx(lensVal(ROWS[k]))]++; });
+  var hd=document.createElement('div'); hd.className='key-h'; hd.textContent='Exposure bands';
+  b.appendChild(hd);
+  BANDS.forEach(function(bd,i){
+    keyRow(b, bd[1], bd[0], BAND_ON[i], false, function(){
+      BAND_ON[i]=!BAND_ON[i]; renderKeys(); if(geoLayer) geoLayer.setStyle(styleC);
+    }, counts[i]);
   });
-  var d1=document.createElement('div'); d1.className='leg-key'; d1.style.marginTop='7px';
-  d1.innerHTML='<span class="leg-sw" style="background:#e0b088;border-radius:50%;width:11px;"></span>Documented — state';
-  var d2=document.createElement('div'); d2.className='leg-key';
-  d2.innerHTML='<span class="leg-sw" style="background:#8fb8c9;border-radius:50%;width:11px;"></span>Private sector, by layer:';
-  b.appendChild(d1); b.appendChild(d2);
+  var h2=document.createElement('div'); h2.className='key-h'; h2.style.marginTop='9px';
+  h2.textContent='Points'; b.appendChild(h2);
+  keyRow(b,'#e0b088','Documented — state',CASE_ON,true,function(){
+    CASE_ON=!CASE_ON; renderKeys(); drawCaseDots();
+  }, CASES.length);
   SECTORS.forEach(function(s){
-    var d=document.createElement('div'); d.className='leg-key';
-    d.innerHTML='<span class="leg-sw" style="background:'+s.accent+';border-radius:50%;width:11px;"></span>'+s.label;
-    b.appendChild(d);
+    keyRow(b, s.accent, s.label, !!SON[s.k], true, function(){
+      SON[s.k]=!SON[s.k]; renderKeys(); renderSectorBox(); drawEntities();
+    }, ENTITIES.filter(function(e){ return e.s===s.k; }).length);
   });
+  var h3=document.createElement('div'); h3.className='key-h'; h3.style.marginTop='9px';
+  h3.textContent='Networks'; b.appendChild(h3);
+  keyRow(b,'#b8574f','Organised-crime groups',NET_ON.groups,true,function(){
+    NET_ON.groups=!NET_ON.groups; renderKeys(); renderNetBox(); drawGroups();
+  }, GROUPS.length);
+  keyRow(b,'#c9a05a','Trafficking corridors',NET_ON.routes,false,function(){
+    NET_ON.routes=!NET_ON.routes; renderKeys(); renderNetBox(); drawRoutes();
+  }, ROUTES.length);
 }
 /* One handler for every panel: the whole header bar is the hit target, not just the
    little glyph. Previously only the glyph carried the click, so the boxes looked
@@ -1364,7 +1402,54 @@ function flyTo(k){
 var WIRE_ARCHIVE_URL = 'wire.json';
 var WIRE_ARCHIVE_ALT = 'https://welcometoyourgalaxy.github.io/capture-wire/wire.json';
 var WIRE_LS = 'capture.wire.v1';
-var _wireAll=[], _wireRegion='', _wireIso='', _wireAge='';
+var _wireAll=[], _wireRegion='', _wireIso='', _wireAge='', _wireLang='';
+
+/* A second net, applied in the page. The archive is produced by a harvester that can be
+   older than this file, and a stale or loosely-tuned wire.json used to put health-care
+   fraud indictments and excessive-force cases in a drug-underworld feed. An item has to
+   carry an illicit-economy anchor AND an institutional term, in any of the languages the
+   harvester collects, or it does not render here whatever the archive says. */
+var W_ANCHOR = [
+ 'cartel','narco','traffick','cocaine','heroin','fentanyl','methamphetamine','captagon',
+ 'opium','opioid','precursor','money launder','launder','organised crime','organized crime',
+ 'mafia','kingpin','drug ring','drug network','drug gang','drug trade','drug lord','narcotic',
+ 'cártel','cartel de','narcotráfico','tráfico de drogas','blanqueo','lavado de dinero','cocaína',
+ 'trafic de drogue','blanchiment','stupéfiants','tráfico de droga','lavagem de dinheiro',
+ 'drogenhandel','geldwäsche','kokain','traffico di droga','riciclaggio','drugshandel','witwassen',
+ 'наркотик','отмывание','уйгур','مخدرات','كبتاجون','تهريب','uyuşturucu','kaçakçılık'
+];
+var W_INST = [
+ 'official','officer','police','customs','minister','mayor','governor','senator','congress',
+ 'judge','prosecutor','general','colonel','army','navy','border','bank','regulator','port',
+ 'airport','company','firm','executive','casino','exchange','indict','convict','sentenc',
+ 'plead','charged','arrest','extradit','sanction','fine','penalty','raid','seiz','forfeit',
+ 'bribe','briber','complicit','cartel','funcionario','policía','aduana','fiscal','juez',
+ 'ministro','banco','puerto','detenido','condenado','imputado','douane','procureur','juge',
+ 'ministre','banque','port','police','beamter','staatsanwalt','zoll','hafen','polizei',
+ 'funzionario','procura','dogana','porto','полиц','таможн','прокур','суд','ضابط','شرطة','جمارك',
+ 'polis','gümrük','savcı','banquier','mis en examen','gendarme','magistrat','entreprise',
+ 'société','bancario','empresa','aduanero','alfândega','delegado','beamten','unternehmen',
+ 'bankier','ambtenaar','haven','banca','impresa','poliziotto','банк','чиновник','مصرف','بنك',
+ 'banka','memur','pejabat','polisi','bea cukai'
+];
+var W_VETO = [
+ 'health care fraud','healthcare fraud','medicare','medicaid','excessive force','civil rights',
+ 'wire fraud scheme','ponzi','tax fraud','insider trading','identity theft','child support',
+ 'immigration status','human smuggling only','fda approves','clinical trial','drug shortage',
+ 'drugmaker','pharma','prescription','weight loss drug','opioid settlement payout',
+ 'transfer window','box office','horoscope','recipe'
+];
+function _wireTopical(it){
+  var s=((it.title||'')+' '+(it.snippet||'')).toLowerCase();
+  for(var v=0;v<W_VETO.length;v++){ if(s.indexOf(W_VETO[v])>=0) return false; }
+  var a=false,i;
+  for(i=0;i<W_ANCHOR.length;i++){ if(s.indexOf(W_ANCHOR[i])>=0){ a=true; break; } }
+  if(!a) return false;
+  for(i=0;i<W_INST.length;i++){ if(s.indexOf(W_INST[i])>=0) return true; }
+  return false;
+}
+var LANGNAME={en:'English',es:'Spanish',fr:'French',pt:'Portuguese',de:'German',it:'Italian',
+              nl:'Dutch',ru:'Russian',ar:'Arabic',tr:'Turkish',id:'Indonesian',sw:'Swahili'};
 
 function _wireSave(items){ try{ localStorage.setItem(WIRE_LS, JSON.stringify(items.slice(0,400))); }catch(e){} }
 function _wireLoad(){ try{ var v=localStorage.getItem(WIRE_LS); return v?JSON.parse(v):[]; }catch(e){ return []; } }
@@ -1381,11 +1466,13 @@ function _ageOK(it){
   var t=_ts(it); if(!t) return true;
   return (Date.now()-t) <= parseInt(_wireAge,10)*86400000;
 }
+function _wireOnTopic(){ return _wireAll.filter(_wireTopical); }
 function _wireFiltered(){
-  return _wireAll.filter(function(it){
+  return _wireOnTopic().filter(function(it){
     if(!_ageOK(it)) return false;
     if(_wireRegion && (it.region||'')!==_wireRegion) return false;
     if(_wireIso && (it.iso||'')!==_wireIso) return false;
+    if(_wireLang && (it.lang||'en')!==_wireLang) return false;
     return true;
   });
 }
@@ -1398,23 +1485,31 @@ function _fillSel(id, values, current, allLabel){
   s.innerHTML=opts;
 }
 function _wireBuildSelectors(){
-  var byR={}, byI={};
-  _wireAll.filter(_ageOK).forEach(function(it){
+  var byR={}, byI={}, byL={};
+  _wireOnTopic().filter(_ageOK).forEach(function(it){
     if(it.region) byR[it.region]=(byR[it.region]||0)+1;
-    if(it.iso) byI[it.iso]=byI[it.iso]||{n:0,name:it.country||it.iso};
-    if(it.iso) byI[it.iso].n++;
+    if(it.iso){ byI[it.iso]=byI[it.iso]||{n:0,name:it.country||it.iso}; byI[it.iso].n++; }
+    var lg=it.lang||'en'; byL[lg]=(byL[lg]||0)+1;
   });
   _fillSel('wireRegion', Object.keys(byR).sort().map(function(k){ return [k,k,byR[k]]; }),
            _wireRegion, 'All regions');
-  _fillSel('wireIso', Object.keys(byI).sort(function(a,b){ return byI[b].n-byI[a].n; })
+  /* alphabetical by displayed name, not by volume — a menu you scan should be sorted the
+     way you scan it */
+  _fillSel('wireIso', Object.keys(byI)
+           .sort(function(a,b){ return byI[a].name.localeCompare(byI[b].name); })
            .map(function(k){ return [k, byI[k].name, byI[k].n]; }), _wireIso, 'All jurisdictions');
+  _fillSel('wireLang', Object.keys(byL)
+           .sort(function(a,b){ return (LANGNAME[a]||a).localeCompare(LANGNAME[b]||b); })
+           .map(function(k){ return [k, LANGNAME[k]||k, byL[k]]; }), _wireLang, 'All languages');
 }
 function _wireRender(){
   var body=document.getElementById('wireList');
   var items=_wireFiltered().sort(function(a,b){ return _ts(b)-_ts(a); });
   document.getElementById('wireN').textContent=items.length;
   if(!items.length){
-    body.innerHTML='<div class="wnote">Nothing in the archive for this filter.</div>'; return;
+    body.innerHTML='<div class="wnote">Nothing in the archive for this filter. If the archive is '+
+      'large but this is empty, the harvester running in the repo is an older build — the page '+
+      'applies its own subject gate and will not render items that fail it.</div>'; return;
   }
   var h='';
   items.slice(0,80).forEach(function(it){
@@ -1459,14 +1554,17 @@ async function loadWire(force){
       'nothing to show &mdash; every other layer on this map is embedded and works offline.</div>';
     return;
   }
-  if(st) st.textContent=_wireAll.length+' stories \u00b7 '+from;
+  var kept=_wireOnTopic().length, drop=_wireAll.length-kept;
+  if(st) st.textContent=kept+' on topic \u00b7 '+from+(drop?(' \u00b7 '+drop+' filtered out'):'');
   _wireBuildSelectors(); _wireRender();
 }
-['wireRegion','wireIso','wireAge'].forEach(function(id){
+['wireRegion','wireIso','wireAge','wireLang'].forEach(function(id){
   var el=document.getElementById(id); if(!el) return;
+  el.addEventListener('click',function(e){ e.stopPropagation(); });
   el.addEventListener('change',function(){
     if(id==='wireRegion') _wireRegion=el.value;
     if(id==='wireIso')    _wireIso=el.value;
+    if(id==='wireLang')   _wireLang=el.value;
     if(id==='wireAge'){ _wireAge=el.value; _wireBuildSelectors(); }
     _wireRender();
   });

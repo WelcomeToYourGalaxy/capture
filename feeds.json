@@ -1,28 +1,126 @@
 {
-  "_comment": "Sources for the Capture wire. 'q' entries become Google News RSS searches; 'url' entries are read directly. iso/region are defaults applied when the geo-tagger finds nothing in the text.",
+  "_comment": "Sources for the Live Drug Underworld Map wire. 'q' entries become Google News RSS searches in the given language; 'url' entries are read directly. The blanket DOJ press-release feed was removed: it is a firehose of every federal indictment in the United States, and health-care fraud and excessive-force cases were reaching the wire through it. Narcotics prosecutions still arrive via the English searches, which carry the same DOJ releases when they are on topic.",
   "searches": [
-    {"q": "drug cartel corruption official arrested"},
-    {"q": "police officer convicted drug trafficking bribe"},
-    {"q": "money laundering bank drug proceeds penalty"},
-    {"q": "customs officer cocaine port arrested"},
-    {"q": "narco politics indictment minister"},
-    {"q": "organised crime infiltration prosecutor investigation"},
-    {"q": "judge prosecutor bribed trafficking case"},
-    {"q": "captagon seizure network"},
-    {"q": "fentanyl precursor indictment company"},
-    {"q": "junket casino money laundering penalty"},
-    {"q": "cartel de la droga funcionario detenido", "lang": "es"},
-    {"q": "policier corruption trafic de drogue", "lang": "fr"},
-    {"q": "polícia corrupção tráfico apreensão", "lang": "pt"}
+    {
+      "q": "drug cartel corruption official arrested"
+    },
+    {
+      "q": "police officer convicted drug trafficking bribe"
+    },
+    {
+      "q": "money laundering bank drug proceeds penalty"
+    },
+    {
+      "q": "customs officer cocaine port arrested"
+    },
+    {
+      "q": "narco politics indictment minister"
+    },
+    {
+      "q": "judge prosecutor bribed trafficking case"
+    },
+    {
+      "q": "captagon network officials seizure"
+    },
+    {
+      "q": "fentanyl precursor indictment company"
+    },
+    {
+      "q": "junket casino money laundering penalty"
+    },
+    {
+      "q": "cartel narcotrafico funcionario detenido",
+      "lang": "es"
+    },
+    {
+      "q": "policia corrupcion narcotrafico soborno",
+      "lang": "es"
+    },
+    {
+      "q": "lavado de dinero banco narcotrafico",
+      "lang": "es"
+    },
+    {
+      "q": "policier corruption trafic de drogue",
+      "lang": "fr"
+    },
+    {
+      "q": "blanchiment banque trafic stupefiants",
+      "lang": "fr"
+    },
+    {
+      "q": "policia corrupcao trafico apreensao",
+      "lang": "pt"
+    },
+    {
+      "q": "lavagem de dinheiro trafico banco",
+      "lang": "pt"
+    },
+    {
+      "q": "Drogenhandel Korruption Beamter Geldwaesche",
+      "lang": "de"
+    },
+    {
+      "q": "traffico di droga corruzione funzionario riciclaggio",
+      "lang": "it"
+    },
+    {
+      "q": "drugshandel corruptie douane witwassen",
+      "lang": "nl"
+    },
+    {
+      "q": "наркотрафик коррупция чиновник отмывание",
+      "lang": "ru"
+    },
+    {
+      "q": "تهريب مخدرات فساد ضابط",
+      "lang": "ar"
+    },
+    {
+      "q": "كبتاجون ضبط شبكة تهريب",
+      "lang": "ar"
+    },
+    {
+      "q": "uyusturucu kacakciligi rusvet polis",
+      "lang": "tr"
+    },
+    {
+      "q": "narkoba korupsi polisi bea cukai",
+      "lang": "id"
+    },
+    {
+      "q": "dawa za kulevya rushwa polisi",
+      "lang": "sw"
+    }
   ],
   "feeds": [
-    {"name": "InSight Crime", "url": "https://insightcrime.org/feed/"},
-    {"name": "Global Initiative", "url": "https://globalinitiative.net/feed/"},
-    {"name": "OCCRP", "url": "https://www.occrp.org/en/feed"},
-    {"name": "UNODC", "url": "https://www.unodc.org/unodc/en/frontpage/rss.xml"},
-    {"name": "Europol", "url": "https://www.europol.europa.eu/newsroom/rss.xml"},
-    {"name": "US DOJ OPA", "url": "https://www.justice.gov/news/rss?type=press_release"},
-    {"name": "FinCEN", "url": "https://www.fincen.gov/news/rss.xml"},
-    {"name": "FATF", "url": "https://www.fatf-gafi.org/en/rss.xml"}
+    {
+      "name": "InSight Crime",
+      "url": "https://insightcrime.org/feed/"
+    },
+    {
+      "name": "Global Initiative",
+      "url": "https://globalinitiative.net/feed/"
+    },
+    {
+      "name": "OCCRP",
+      "url": "https://www.occrp.org/en/feed"
+    },
+    {
+      "name": "UNODC",
+      "url": "https://www.unodc.org/unodc/en/frontpage/rss.xml"
+    },
+    {
+      "name": "Europol",
+      "url": "https://www.europol.europa.eu/newsroom/rss.xml"
+    },
+    {
+      "name": "FinCEN",
+      "url": "https://www.fincen.gov/news/rss.xml"
+    },
+    {
+      "name": "FATF",
+      "url": "https://www.fatf-gafi.org/en/rss.xml"
+    }
   ]
 }
