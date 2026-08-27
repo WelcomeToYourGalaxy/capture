@@ -1,0 +1,28 @@
+{
+  "_comment": "Sources for the Capture wire. 'q' entries become Google News RSS searches; 'url' entries are read directly. iso/region are defaults applied when the geo-tagger finds nothing in the text.",
+  "searches": [
+    {"q": "drug cartel corruption official arrested"},
+    {"q": "police officer convicted drug trafficking bribe"},
+    {"q": "money laundering bank drug proceeds penalty"},
+    {"q": "customs officer cocaine port arrested"},
+    {"q": "narco politics indictment minister"},
+    {"q": "organised crime infiltration prosecutor investigation"},
+    {"q": "judge prosecutor bribed trafficking case"},
+    {"q": "captagon seizure network"},
+    {"q": "fentanyl precursor indictment company"},
+    {"q": "junket casino money laundering penalty"},
+    {"q": "cartel de la droga funcionario detenido", "lang": "es"},
+    {"q": "policier corruption trafic de drogue", "lang": "fr"},
+    {"q": "polícia corrupção tráfico apreensão", "lang": "pt"}
+  ],
+  "feeds": [
+    {"name": "InSight Crime", "url": "https://insightcrime.org/feed/"},
+    {"name": "Global Initiative", "url": "https://globalinitiative.net/feed/"},
+    {"name": "OCCRP", "url": "https://www.occrp.org/en/feed"},
+    {"name": "UNODC", "url": "https://www.unodc.org/unodc/en/frontpage/rss.xml"},
+    {"name": "Europol", "url": "https://www.europol.europa.eu/newsroom/rss.xml"},
+    {"name": "US DOJ OPA", "url": "https://www.justice.gov/news/rss?type=press_release"},
+    {"name": "FinCEN", "url": "https://www.fincen.gov/news/rss.xml"},
+    {"name": "FATF", "url": "https://www.fatf-gafi.org/en/rss.xml"}
+  ]
+}
