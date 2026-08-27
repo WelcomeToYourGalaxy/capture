@@ -680,6 +680,10 @@ body.info-open #controls #indexPanel{position:static !important;
          border-bottom:1px solid rgba(201,162,39,0.22);}
   .key-sub{text-transform:none;letter-spacing:0;color:#7d859a;font-size:9px;}
   .key-par{font-weight:600;color:#d6dae6;margin-top:2px;}
+  .key-tip{position:fixed;z-index:10000;pointer-events:none;max-width:260px;
+    padding:5px 8px;border-radius:4px;font-size:11px;line-height:1.35;color:#eef1f7;
+    background:rgba(14,17,26,0.96);border:1px solid rgba(201,162,39,0.45);
+    box-shadow:0 4px 14px rgba(0,0,0,0.5);}
   .key-par.off{color:#6b7285;font-weight:400;}
   .kt-car{flex:0 0 auto;width:9px;font-size:8px;color:#8f97ab;cursor:pointer;}
   /* every level steps in from the one above it, so the tree is readable as a tree */
@@ -731,7 +735,7 @@ body.info-open #controls #indexPanel{position:static !important;
       So this map does not claim a percentage. It carries layers that can each be checked, and keeps them apart.<br><br>
       The first is a 193-country score built from the Global Organized Crime Index 2025. Its state-embedded actors indicator measures officials, police and security personnel using state power for illicit advantage; 80 of 193 countries score 7.5 or higher, the band the Index calls severe. That indicator covers all organised crime, so on its own it is not a drug measure. It is combined here with all four drug-market indicators as a geometric mean, because capture by the drug underworld requires both a penetrable state and a drug economy large enough to be worth buying it. A country with severe state capture and no drug trade scores low, and so does a large drug economy inside a state nobody has managed to buy.<br><br>
       The second layer is the documented record: convictions, indictments, and regulatory settlements where an institution's capture was established or formally charged. A head of state convicted in New York. A cabinet minister who ran the federal police, convicted of taking cartel money. A navy chief taken in a sting. Roughly 30% of one national legislature investigated. A bank pleading guilty to conspiring to launder, with a branch manager paid in gift cards.<br><br>
-      The distance between the layers is the finding. Twenty-two state cases and thirty-six firms, against fifty-one countries at severe exposure. The score estimates the exposure; the cases show what proof looks like when it exists, and how rarely it does.
+      The third layer is the trade itself: an inventory of named criminal organisations, cells and factions worldwide, and the corridors along which product moves between them. Cartels and their regional cells, prison-born organisations that outgrew the prisons, mafias, confraternities, biker clubs, street and port networks, and armed groups that tax a route rather than run it. The corridors connect them &mdash; the Balkan route out of Afghanistan, the Atlantic crossing to West Africa, the Pacific littoral north to Mexico, the captagon line from the Levant to the Gulf. This layer answers a different question from the two above. It is not evidence of capture and feeds no score; it shows who is operating where, and along which lines, which is the context the first two layers sit inside.
       </div>
       <div class="sub-h" id="methodSubHead"><span>Methodology</span><span class="sub-tog">&plus;</span></div>
       <div id="methodBody" class="sub-body"></div>
@@ -1464,11 +1468,31 @@ function swatch(colour, on, shape){
     (on?('background:'+colour):('background:transparent;box-shadow:inset 0 0 0 1px '+colour))+
     box+'"></span>';
 }
+/* Some rows say what the layer actually contains rather than naming it in one word, and
+   the key column is too narrow for that. The label is clipped with an ellipsis and the
+   full text is shown on hover, so nothing runs off the panel and nothing is lost. */
+function keyTip(el, label){
+  var l=el.querySelector('.kt-l'); if(!l) return;
+  l.addEventListener('mouseenter', function(){
+    if(l.scrollWidth <= l.clientWidth + 1) return;   /* it already fits */
+    var t=document.createElement('div');
+    t.className='key-tip'; t.textContent=label;
+    document.body.appendChild(t);
+    var r=l.getBoundingClientRect();
+    t.style.left=Math.max(6, Math.min(r.left, window.innerWidth-t.offsetWidth-6))+'px';
+    t.style.top=Math.max(6, r.top-t.offsetHeight-6)+'px';
+    l.__tip=t;
+  });
+  l.addEventListener('mouseleave', function(){
+    if(l.__tip){ l.__tip.remove(); l.__tip=null; }
+  });
+}
 function keyRow(parent, colour, label, on, shape, cb, count, cls){
   var d=document.createElement('div');
   d.className='leg-key key-tog'+(on?'':' off')+(cls?(' '+cls):'');
   d.innerHTML=swatch(colour,on,shape)+'<span class="kt-l">'+label+'</span>'+
     (count!=null?('<span class="kt-n">'+count+'</span>'):'');
+  keyTip(d, label);
   d.onclick=function(e){ e.stopPropagation(); cb(); };
   parent.appendChild(d);
   return d;
@@ -1491,6 +1515,7 @@ function keyParent(parent, colour, label, on, shape, key, count, toggle, depth){
   d.innerHTML='<span class="kt-car">'+(KEY_OPEN[key]?'\u25be':'\u25b8')+'</span>'+
     swatch(colour,on,shape)+'<span class="kt-l">'+label+'</span>'+
     (count!=null?('<span class="kt-n">'+count+'</span>'):'');
+  keyTip(d, label);
   d.onclick=function(e){
     e.stopPropagation();
     if(e.target && e.target.className==='kt-car'){ KEY_OPEN[key]=!KEY_OPEN[key]; renderKeys(); }
@@ -1505,6 +1530,9 @@ function setLens(k){
   renderKeys(); buildHatches(); if(geoLayer) geoLayer.setStyle(styleC); buildIndex();
 }
 function renderKeys(){
+  /* the key rebuilds on every toggle; a tooltip whose row is removed mid-hover would
+     never receive mouseleave, so clear any that are open before rebuilding */
+  Array.prototype.forEach.call(document.querySelectorAll('.key-tip'), function(t){ t.remove(); });
   var b=document.getElementById('legKeys'); b.innerHTML='';
   var counts=[0,0,0,0,0];
   Object.keys(ROWS).forEach(function(k){ counts[bandIdx(lensVal(ROWS[k]))]++; });
@@ -1517,24 +1545,24 @@ function renderKeys(){
   b.appendChild(note);
 
   /* severity — the five bands of whichever lens is active */
-  keyParent(b, BANDS[0][1], 'Severity', true, 'bar', 'sev', null, null, 2);
+  keyParent(b, BANDS[0][1], 'Severity', true, 'bar', 'sev', null, null, 0);
   if(KEY_OPEN.sev){
     BANDS.forEach(function(bd,i){
       keyRow(b, bd[1], bd[0], BAND_ON[i], 'band'+i, function(){
         BAND_ON[i]=!BAND_ON[i]; renderKeys(); buildHatches();
         if(geoLayer) geoLayer.setStyle(styleC);
-      }, counts[i], 'key-child d3');
+      }, counts[i], 'key-child d2');
     });
   }
 
   /* the five indicators the composite is built from, each selectable as a lens */
-  keyParent(b, '#c9a227', 'Show one indicator at a time', true, 'bar', 'crit', null, null, 2);
+  keyParent(b, '#c9a227', 'Show one indicator at a time', true, 'bar', 'crit', null, null, 0);
   if(KEY_OPEN.crit){
     LENSES.forEach(function(L_){
       if(L_.k==='exp') return;                 /* the composite itself, not a criterion */
       var on=(L_.k===LENS);
       keyRow(b, L_.accent, L_.label, on, 'bar', function(){ setLens(L_.k); },
-             null, 'key-child d3'+(on?' key-sel':''));
+             null, 'key-child d2'+(on?' key-sel':''));
       keyDesc(b, L_.desc, on, 3);
     });
   }
