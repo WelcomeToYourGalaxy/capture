@@ -1038,7 +1038,7 @@ function declutter(){
 var _declT=null;
 function declSoon(){ clearTimeout(_declT); _declT=setTimeout(declutter, 60); }
 map.on('zoomend', declSoon);
-map.on('moveend', declSoon); map.on('moveend', declSoon);
+map.on('moveend', declSoon);
 
 /* ---- organised-crime groups + trafficking corridors ---- */
 var groupLayer=null, routeLayer=null;
@@ -1048,8 +1048,15 @@ function drawGroups(){
   if(!NET_ON.groups){ declSoon(); return; }
   groupLayer=L.layerGroup();
   GROUPS.forEach(function(g){
-    var m=L.circleMarker([g.lat,g.lng],{radius:3.4,color:'rgba(0,0,0,0.55)',weight:0.8,
-        fillColor:g.col,fillOpacity:0.9,pane:'pts',renderer:R_PTS,bubblingMouseEvents:false});
+    /* researched entries are drawn larger with a pale ring. This declaration was lost in
+       an earlier edit while the references below survived, so drawGroups threw on its
+       first iteration — and because drawRoutes() sits on the same init statement, the
+       corridors disappeared with the groups. */
+    var researched = (typeof g.note === 'number');
+    var m=L.circleMarker([g.lat,g.lng],{radius:researched?5.2:3.4,
+        color:researched?'#f0e2c8':'rgba(0,0,0,0.55)',weight:researched?1.3:0.8,
+        fillColor:g.col,fillOpacity:researched?0.98:0.9,
+        pane:'pts',renderer:R_PTS,bubblingMouseEvents:false});
     m.bindTooltip(g.n+(researched?' \u2014 researched':''),{direction:'top',offset:[0,-4]});
     m.on('click',function(e){
       var nt = researched ? NOTES[g.note] : null;
@@ -1637,7 +1644,10 @@ function renderMethod(){
 }
 
 
-renderLenses(); renderKeys(); renderSectorBox(); renderNetBox(); drawEntities(); drawGroups(); drawRoutes();
+[['lenses',renderLenses],['key',renderKeys],['sectors',renderSectorBox],['networks',renderNetBox],
+ ['firms',drawEntities],['groups',drawGroups],['corridors',drawRoutes]].forEach(function(step){
+  try{ step[1](); }catch(err){ console.error('[capture] '+step[0]+' failed:',err); }
+});
 </script>
 </body>
 </html>
