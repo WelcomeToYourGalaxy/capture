@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Harvest the Capture wire.
+"""Harvest the Live Drug Underworld Map wire.
 
-Reads feeds.json, pulls every source, filters on subject keywords, geo-tags each item
-to a jurisdiction and a region, de-duplicates, and writes wire.json.
+Reads feeds.json, pulls every source in parallel, applies a three-part subject gate,
+geo-tags each surviving item, de-duplicates, and writes wire.json.
 
 The output schema is the one the map reads:
 
@@ -13,18 +13,38 @@ The output schema is the one the map reads:
       "iso":   str,      # ISO3, "" when nothing matched
       "country": str,    # display name for the iso
       "region": str,     # continent-level bucket
-      "subregion": str,  # UN subregion
+      "subregion": str,  # UN subregion  (also written as "subs" — the page reads that)
       "snippet": str,    # first ~240 chars of the summary
       "lang":  str,      # feed language hint
-      "sig":   int},     # keyword signal strength, 0-20
+      "sig":   int,      # signal strength, 0-20
+      "why":   str,      # which gate path passed it, for auditing
+      "v":     2},       # gate version; the page trusts v>=2 and re-filters older archives
      ...]
 
 Nothing here decides what is true. It decides what is worth a human look.
+
+Two faults in the first build are fixed here.
+
+VOLUME. Google News ANDs every bare word in a query, so "drug cartel corruption
+official arrested" demanded all five words in one story and returned almost nothing.
+Queries now come from feeds.json as parenthesised OR groups, and they run against
+Google News country editions rather than four language settings, which also gives each
+item a default jurisdiction when the text does not name one.
+
+SUBJECT. The old gate asked for a drug word plus an institution word, and its
+institution list held bare enforcement verbs — seized, raid, arrested. A routine
+seizure passed it. Matching was by substring, so "port" matched "report" and "general"
+matched "general election". This map is about institutions being captured, so an item
+now has to carry an illicit-economy ANCHOR, an institutional ACTOR, and a CAPTURE
+predicate saying the actor is implicated. Enforcement verbs alone are not a capture
+predicate: they qualify only next to a role that can be a defendant (officer, judge,
+minister, banker), never next to a bare enforcing body (police, authorities, court).
 """
 
-import json, re, html, hashlib, sys, time
+import json, re, html, hashlib, sys, time, socket, random
 from datetime import datetime, timezone, timedelta
 from urllib.parse import quote_plus, urlparse
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import feedparser
@@ -32,97 +52,338 @@ except ImportError:
     sys.exit("pip install feedparser")
 
 MAX_AGE_DAYS = 45
-MAX_ITEMS    = 1200
-UA = "capture-wire/1.0 (+https://welcometoyourgalaxy.com)"
+MAX_ITEMS    = 1500
+WORKERS      = 8
+UA = "capture-wire/2.0 (+https://welcometoyourgalaxy.com)"
+socket.setdefaulttimeout(30)
 
-# ---------------------------------------------------------------- subject gate
-KEEP = {
-    "cartel": 4, "narco": 4, "trafficking": 3, "traffickers": 3, "cocaine": 3,
-    "heroin": 3, "fentanyl": 3, "methamphetamine": 3, "captagon": 4, "opium": 3,
-    "precursor": 3, "money laundering": 4, "laundering": 3, "bribe": 3, "bribery": 3,
-    "corruption": 2, "corrupt": 2, "smuggling": 2, "organised crime": 3,
-    "organized crime": 3, "mafia": 3, "kingpin": 3, "extradited": 3, "extradition": 2,
-    "indicted": 3, "indictment": 3, "convicted": 3, "sentenced": 2, "pleaded guilty": 3,
-    "prosecutor": 2, "seizure": 2, "seized": 2, "customs": 2, "port": 1,
-    "police officer": 3, "sanctioned": 2, "ofac": 3, "asset forfeiture": 3,
-    "state capture": 4, "protection racket": 3, "junket": 3, "shell company": 2,
-    "officer": 2, "official": 2, "arrested": 2, "charged": 2, "raid": 2, "port": 1,
-    "minister": 2, "judge": 2, "general": 1, "customs officer": 2, "complicity": 2,
-    # Non-English weights. Without these the anchor and institution gates would pass a
-    # Spanish or Russian item and the English-only score table would then bury it under
-    # MIN_SIG — the multilingual searches would have returned nothing usable.
-    "narcotráfico": 4, "narcotrafico": 4, "cártel": 4, "lavado de dinero": 4, "blanqueo": 3,
-    "funcionario": 2, "aduana": 2, "detenido": 2, "condenado": 2, "policía": 2, "soborno": 3,
-    "trafic de drogue": 4, "blanchiment": 4, "stupéfiants": 3, "banquier": 2, "douane": 2,
-    "mis en examen": 2, "corruption policière": 3,
-    "lavagem de dinheiro": 4, "tráfico": 3, "apreensão": 2, "delegado": 2,
-    "drogenhandel": 4, "geldwäsche": 4, "beamter": 2, "zoll": 2, "verhaftet": 2,
-    "traffico di droga": 4, "riciclaggio": 4, "funzionario": 2, "dogana": 2, "arrestato": 2,
-    "drugshandel": 4, "witwassen": 4, "ambtenaar": 2, "aangehouden": 2,
-    "наркотраф": 4, "отмывание": 4, "чиновник": 2, "таможн": 2, "задержан": 2, "взятк": 3,
-    "مخدرات": 4, "كبتاجون": 4, "تهريب": 3, "ضابط": 2, "شرطة": 2, "رشوة": 3,
-    "uyuşturucu": 4, "kaçakçılık": 3, "rüşvet": 3, "gümrük": 2, "gözaltına": 2,
-    "narkoba": 4, "korupsi": 3, "bea cukai": 2, "ditangkap": 2,
-    "dawa za kulevya": 4, "rushwa": 3, "polisi": 2,
-}
-DROP = [
-    "football", "soccer", "premier league", "nba", "nfl", "cricket score", "box office",
-    "recipe", "horoscope", "celebrity", "fashion week", "transfer window", "how to watch",
-    "coupon", "discount code", "stock forecast", "price prediction", "casino bonus",
-    "review: ", "obituary", "weather forecast", "opinion:", "editorial:", "podcast",
-    "what to know", "live updates", "explainer", "best of", "gift guide", "streaming",
-    "drug store", "drugstore", "pharmacy hours", "weight loss drug", "cancer drug",
-    "drug trial", "clinical trial", "fda approves", "prescription costs", "war on drugs review",
-    "drug shortage", "generic drug", "drugmaker", "pharma stock", "share price",
-    # the failure modes that actually showed up in the feed
+# ----------------------------------------------------------------- matching
+# Every list below is matched on word boundaries, not substrings. Non-Latin terms fall
+# back to substring because the boundary classes do not apply to those scripts.
+_LAT = "a-zà-öø-ÿ"
+
+def _rx(terms):
+    """One compiled alternation per list.
+
+    Latin terms take a leading word boundary. Terms of seven characters or more also
+    allow up to three trailing letters, so drogenhandel matches drogenhandels and
+    prosecutor matches prosecutors; short terms keep both boundaries, so port does not
+    match report and meth does not match method. Non-Latin scripts fall back to plain
+    substring, the boundary classes not applying to them.
+    """
+    strict, loose, other = [], [], []
+    for t in terms:
+        t = t.lower()
+        if not re.search(r"[a-zà-öø-ÿ]", t):
+            other.append(re.escape(t))
+        elif len(t) >= 7:
+            loose.append(re.escape(t))
+        else:
+            strict.append(re.escape(t))
+    parts = []
+    if strict:
+        parts.append(r"(?<![%s])(?:%s)(?![%s])"
+                     % (_LAT, "|".join(sorted(strict, key=len, reverse=True)), _LAT))
+    if loose:
+        parts.append(r"(?<![%s])(?:%s)(?![%s]{4,})"
+                     % (_LAT, "|".join(sorted(loose, key=len, reverse=True)), _LAT))
+    if other:
+        parts.append(r"(?:%s)" % "|".join(sorted(other, key=len, reverse=True)))
+    return re.compile("|".join(parts), re.I | re.U)
+
+
+# --- 1. the illicit economy itself -----------------------------------------
+ANCHOR = [
+    "cartel", "cartels", "narco", "narcos", "narcotics", "narcotic", "trafficking",
+    "trafficker", "traffickers", "cocaine", "heroin", "fentanyl", "methamphetamine",
+    "meth", "captagon", "opium", "opioid", "precursor", "precursors", "drug ring",
+    "drug network", "drug gang", "drug trade", "drug lord", "drug money", "drug proceeds",
+    "money laundering", "laundering", "laundered", "organised crime", "organized crime",
+    "mafia", "mob", "kingpin", "smuggling ring", "criminal network", "criminal proceeds",
+    "cártel", "cartel de", "narcotráfico", "narcotrafico", "tráfico de drogas",
+    "tráfico de droga", "estupefacientes", "blanqueo", "lavado de dinero",
+    "lavado de activos", "cocaína", "cocaina", "crimen organizado", "narcomenudeo",
+    "lavagem de dinheiro", "tráfico de drogas", "crime organizado", "facção", "milícia",
+    "trafic de drogue", "trafic de stupéfiants", "narcotrafic", "blanchiment",
+    "stupéfiants", "cocaïne", "crime organisé",
+    "drogenhandel", "geldwäsche", "kokain", "drogengeld", "organisierte kriminalität",
+    "traffico di droga", "narcotraffico", "riciclaggio", "cocaina", "ndrangheta",
+    "camorra", "cosa nostra",
+    "drugshandel", "witwassen", "drugsgeld", "georganiseerde misdaad", "ondermijning",
+    "наркотик", "наркотраф", "наркоторговл", "отмывание", "кокаин", "наркодоход",
+    "наркотрафік", "наркоторгівл", "відмивання",
+    "مخدرات", "كبتاجون", "تهريب", "غسل الأموال", "كوكايين",
+    "uyuşturucu", "kaçakçılık", "kara para", "kokain",
+    "narkoba", "sabu", "pencucian uang", "peredaran narkoba",
+    "dawa za kulevya", "utakatishaji",
+    "ναρκωτικ", "ξέπλυμα", "narkotyk", "pranie pieniędzy", "droguri", "spălare de bani",
+    "дрог", "прање новца", "narkotika", "penningtvätt", "ยาเสพติด", "ฟอกเงิน",
+    "ma túy", "rửa tiền", "סמים", "הלבנת הון",
+    # the people, not only the trade. A headline often names only the dealer.
+    "drug dealer", "drug smuggler", "narcotrafficker", "narcotraficante", "traficante",
+    "narcotrafiquant", "trafiquant de drogue", "drogenhändler", "drogenhandel",
+    "drogenring", "rauschgift", "spacciatore", "trafficante", "drugsbende",
+    "drugsdealer", "drugscriminaliteit", "наркоторгов", "наркобарон", "наркогруппиров",
+    "наркоділ", "تاجر مخدرات", "شبكة تهريب", "uyuşturucu satıcı", "uyuşturucu çetesi",
+    "pengedar narkoba", "bandar narkoba", "jaringan narkoba", "mfanyabiashara wa dawa",
+    "narcotráfico", "narcoestado", "narco-state", "narco state",
+]
+
+# --- 2. who can be captured -------------------------------------------------
+# ROLE: a person or firm that can sit in the dock. A judicial outcome next to one of
+# these is itself evidence of capture.
+ROLE = [
+    "official", "officials", "officer", "officers", "agent", "agents", "inspector",
+    "commissioner", "constable", "sergeant", "detective", "customs officer",
+    "border guard", "immigration officer", "prison guard", "warden", "soldier",
+    "colonel", "general", "commander", "admiral", "captain", "lieutenant",
+    "judge", "magistrate", "prosecutor", "clerk of court", "notary", "lawyer",
+    "attorney", "mayor", "governor", "senator", "congressman", "lawmaker",
+    "legislator", "councillor", "councilman", "minister", "deputy minister",
+    "president", "vice president", "diplomat", "ambassador", "spy chief",
+    "banker", "executive", "chief executive", "chairman", "board member",
+    "accountant", "auditor", "regulator", "port official", "harbourmaster",
+    "police officer", "policeman", "ex-police", "former officer", "former official",
+    "funcionario", "funcionarios", "agente", "comisario", "oficial", "expolicía",
+    "policial", "delegado", "juez", "jueza", "fiscal", "magistrado", "alcalde",
+    "gobernador", "senador", "diputado", "ministro", "coronel", "aduanero",
+    "escribano", "empresario", "banquero", "servidor público",
+    "funcionário", "promotor", "prefeito", "vereador", "deputado", "policial civil",
+    "policier", "gendarme", "douanier", "magistrat", "procureur", "juge", "maire",
+    "ministre", "député", "banquier", "fonctionnaire", "élu",
+    "beamter", "beamten", "polizist", "zollbeamter", "richter", "staatsanwalt",
+    "bürgermeister", "abgeordneter", "bankier",
+    "funzionario", "poliziotto", "carabiniere", "doganiere", "giudice", "magistrato",
+    "sindaco", "deputato", "banchiere",
+    "ambtenaar", "politieman", "douanier", "rechter", "burgemeester", "wethouder",
+    "чиновник", "полицейск", "таможенник", "судья", "прокурор", "депутат", "генерал",
+    "посадовец", "митник", "суддя",
+    "ضابط", "مسؤول", "قاض", "نائب", "وزير", "جمركي",
+    "memur", "polis memuru", "hakim", "savcı", "belediye başkanı", "milletvekili",
+    "pejabat", "oknum", "jaksa", "hakim", "bupati", "kapolres", "anggota dprd",
+    "afisa", "mbunge", "jaji", "diwani",
+]
+# ORG: an institution or firm. Capture shows up as an institution being fined,
+# sanctioned, infiltrated or used to launder, not as it arresting someone.
+ORG = [
+    "police", "police force", "police department", "police unit", "military", "army", "navy",
+    "air force", "coast guard", "national guard", "gendarmerie", "customs", "customs service",
+    "border force", "immigration service", "intelligence service", "security service",
+    "prison", "penitentiary", "judiciary", "attorney general's office", "ministry",
+    "government", "municipality", "city hall", "parliament", "congress", "senate",
+    "ruling party", "campaign", "bank", "banks", "lender", "financial institution",
+    "credit union", "money transfer", "remittance", "casino", "junket", "exchange",
+    "brokerage", "law firm", "accounting firm", "shell company", "company", "firm",
+    "corporation", "conglomerate", "port", "port authority", "airport", "terminal",
+    "shipping line", "freight forwarder", "airline", "logistics",
+    "policía", "ejército", "armada", "aduana", "aduanas", "fuerza pública", "gobierno",
+    "municipio", "banco", "empresa", "compañía", "puerto", "aeropuerto", "casino",
+    "fiscalía", "guardia nacional", "penal",
+    "polícia", "alfândega", "prefeitura", "banco", "empresa", "porto", "aeroporto",
+    "police nationale", "douane", "mairie", "banque", "entreprise", "société", "port",
+    "aéroport", "gendarmerie",
+    "polizei", "zoll", "behörde", "bank", "unternehmen", "hafen", "flughafen",
+    "polizia", "guardia di finanza", "dogana", "comune", "banca", "azienda", "porto",
+    "politie", "douane", "gemeente", "bank", "bedrijf", "haven",
+    "полиция", "таможня", "прокуратура", "банк", "компания", "порт", "правительство",
+    "поліція", "митниця", "банк",
+    "شرطة", "جمارك", "بنك", "مصرف", "شركة", "ميناء", "حكومة",
+    "polis", "gümrük", "banka", "şirket", "liman", "emniyet",
+    "polisi", "bea cukai", "kepolisian", "bank", "perusahaan", "pelabuhan", "kejaksaan",
+    "polisi", "forodha", "benki", "kampuni", "bandari",
+]
+# Bodies that normally appear as the enforcer. On their own they never satisfy the
+# defendant test — "police arrested a trafficker" is not a capture story.
+ENFORCER_ONLY = _rx([
+    "police", "authorities", "prosecutors", "investigators", "court", "courts",
+    "task force", "agency", "dea", "fbi", "interpol", "europol", "guardia civil",
+    "policía", "autoridades", "fiscales", "tribunal", "juzgado", "polícia", "polizia",
+    "politie", "polizei", "police", "полиция", "поліція", "الشرطة", "polis", "polisi",
+])
+
+# --- 3. the capture predicate ----------------------------------------------
+# STRONG: says on its own that an institution or its people are implicated.
+CAPTURE_STRONG = [
+    "bribe", "bribes", "bribed", "bribery", "kickback", "kickbacks", "corrupt",
+    "corruption", "collusion", "collude", "colluded", "complicity", "complicit",
+    "on the payroll", "payroll", "protection racket", "protection money", "tipped off",
+    "leaked information", "sold information", "infiltrate", "infiltrated",
+    "infiltration", "state capture", "captured by", "embezzle", "embezzlement",
+    "misconduct", "abuse of office", "abuse of power", "cover-up", "obstruction",
+    "conflict of interest", "shell company", "front company", "money laundering",
+    "laundering", "laundered", "sanctioned", "designated", "blacklisted", "fined",
+    "penalty", "forfeiture", "deferred prosecution", "impeached", "graft",
+    "soborno", "sobornos", "cohecho", "corrupción", "corrupto", "complicidad",
+    "coima", "mordida", "encubrimiento", "peculado", "enriquecimiento ilícito",
+    "lavado", "blanqueo", "sancionado", "multa",
+    "suborno", "propina", "corrupção", "conivência", "lavagem", 
+    "corruption", "pot-de-vin", "pots-de-vin", "complicité", "blanchiment",
+    "prise illégale", "trafic d'influence", "amende", "sanctionné",
+    "korruption", "bestechung", "beihilfe", "geldwäsche", "unterwandert", "verstrickt",
+    "corruzione", "tangente", "tangenti", "concussione", "complicità", "riciclaggio",
+    "infiltrazione", "collusione",     "corruptie", "omkoping", "medeplichtig", "witwassen", "ondermijning", "banden met",
+    "коррупц", "взятк", "крышевание", "пособничество", "отмывание", 
+    "корупц", "хабар", "відмивання",
+    "فساد", "رشوة", "تواطؤ", "غسل", "اختراق", 
+    "rüşvet", "yolsuzluk", "aklama", "iş birliği", 
+    "suap", "korupsi", "gratifikasi", "bekingan", "pencucian uang", "terlibat",
+    "rushwa", "ufisadi", "utakatishaji", "kuhusika",
+    "διαφθορά", "δωροδοκία", "korupcja", "łapówka", "corupție", "mită",
+    "корупција", "мито", "korruption", "muta", "ทุจริต", "สินบน",
+    "tham nhũng", "hối lộ", "שוחד", "שחיתות",
+]
+# WEAK: a judicial or disciplinary outcome. Counts only within 70 characters of a ROLE,
+# so "former customs officer sentenced" passes and "police seized two tonnes" does not.
+CAPTURE_WEAK = [
+    "ties to", "links to", "linked to", "connections to", "vínculos con", "nexos con",
+    "vínculos com", "liens avec", "legami con", "banden met", "связи с", "صلات",
+    "bağlantı", "convicted", "conviction", "indicted", "indictment", "sentenced", "jailed",
+    "pleaded guilty", "guilty plea", "charged", "accused", "arrested", "detained",
+    "suspended", "dismissed", "fired", "sacked", "removed from office", "resigned",
+    "under investigation", "probe", "raided", "extradited", "on trial", "stands trial",
+    "condenado", "condena", "detenido", "imputado", "procesado", "acusado",
+    "destituido", "separado del cargo", "vinculado a proceso", "sentenciado",
+    "condenado", "indiciado", "preso", "afastado", "denunciado",
+    "condamné", "mis en examen", "écroué", "révoqué", "interpellé", "jugé",
+    "verurteilt", "angeklagt", "festgenommen", "entlassen", "suspendiert",
+    "condannato", "arrestato", "indagato", "rimosso", "sospeso",
+    "veroordeeld", "aangehouden", "verdacht", "ontslagen", "geschorst",
+    "осуждён", "осужден", "задержан", "обвинён", "уволен", "отстранён", "арестован",
+    "засуджений", "затриманий", "звільнений",
+    "إدانة", "توقيف", "اتهام", "إقالة", "محاكمة",
+    "tutuklandı", "mahkum", "gözaltına", "görevden", "hakkında dava",
+    "ditangkap", "divonis", "tersangka", "dipecat", "dinonaktifkan",
+    "kukamatwa", "kuhukumiwa", "kushtakiwa", "kufukuzwa",
+]
+
+# --- 4. what never belongs here --------------------------------------------
+VETO = [
+    # fiction and entertainment. "Corrupción en Miami" is the Spanish title of Miami
+    # Vice and reached the old wire tagged as a United States story.
+    "corrupción en miami", "miami vice", "narcos season", "netflix", "hbo", "disney+",
+    "prime video", "series", "season", "episode", "episodes", "trailer", "box office",
+    "biopic", "spin-off", "streaming", "soundtrack", "starring", "cast of", "premiere",
+    "serie", "series de", "temporada", "capítulo", "estreno", "película", "telenovela",
+    "novela", "reparto", "banda sonora", "episódio", "filme", "film", "saison",
+    "épisode", "bande-annonce", "staffel", "folge", "stagione", "puntata",
+    "videojuego", "video game", "sinopsis", "review", "reseña",
+    # appointments and career moves. "Head of FinCEN leaving to join Citibank" is a
+    # personnel item, not an allegation.
+    "leaving to join", "joins as", "appointed", "appointment of", "named as", "named to",
+    "steps down", "stepping down", "to lead", "new chief executive", "takes over as",
+    "sworn in", "nominated", "nomination", "confirmation hearing", "obituary",
+    # medicine and pharma, which share the word "drug"
+    "clinical trial", "drug trial", "fda approves", "drug shortage", "generic drug",
+    "drugmaker", "pharma", "prescription", "weight loss drug", "cancer drug",
+    "drug store", "drugstore", "pharmacy", "opioid settlement", "overdose prevention",
+    "harm reduction", "rehab centre", "rehab center", "addiction treatment",
+    # frauds with no drug nexus, which the old blanket DOJ feed poured in
     "health care fraud", "healthcare fraud", "medicare", "medicaid", "excessive force",
     "civil rights violation", "ponzi", "insider trading", "identity theft", "tax fraud",
     "unemployment fraud", "ppp loan", "child support", "counterfeit airbags",
-    "wire fraud scheme", "securities fraud", "bank robbery", "carjacking",
+    "bank robbery", "carjacking", "romance scam", "elder fraud",
+    # sport, lifestyle, listicles
+    "football", "soccer", "premier league", "nba", "nfl", "cricket score", "recipe",
+    "horoscope", "fashion week", "transfer window", "how to watch", "coupon",
+    "discount code", "stock forecast", "price prediction", "casino bonus", "gift guide",
+    "best of", "what to know", "live updates", "explainer", "opinion:", "editorial:",
 ]
-MIN_SIG = 6
 
-# An item must carry BOTH an illicit-economy anchor and an institutional/enforcement term.
-# Keyword weight alone let through anything that merely used the vocabulary — a corruption
-# story with no drug angle, a drug-possession arrest with no institution in it.
-ANCHOR = [
-    # English
-    "cartel", "narco", "trafficking", "traffick", "cocaine", "heroin", "fentanyl",
-    "methamphetamine", "meth ", "captagon", "opium", "opioid", "precursor", "drug ring",
-    "drug network", "drug gang", "drug trade", "drug lord", "money laundering",
-    "laundering", "organised crime", "organized crime", "mafia", "kingpin", "smuggling ring",
-    # es / pt
-    "cártel", "cartel de", "narcotráfico", "narcotrafico", "tráfico de drogas",
-    "tráfico de droga", "blanqueo", "lavado de dinero", "lavagem de dinheiro", "cocaína",
-    "cocaina", "estupefaciente",
-    # fr
-    "trafic de drogue", "trafic de stupéfiants", "blanchiment", "stupéfiants",
-    # de / nl / it
-    "drogenhandel", "geldwäsche", "kokain", "drugshandel", "witwassen",
-    "traffico di droga", "riciclaggio",
-    # ru / ar / tr / id / sw
-    "наркотик", "наркотраф", "отмывание", "мхдр", "مخدرات", "كبتاجون", "تهريب",
-    "uyuşturucu", "kaçakçılık", "narkoba", "dawa za kulevya",
+# --- 5. scoring -------------------------------------------------------------
+# Weights only order the feed; the gate above decides membership. Scoring counts
+# categories rather than a table of English words, because the first build scored a
+# Russian or Indonesian item at zero and dropped it after it had passed the gate.
+HIGH_OFFICE = [
+    "minister", "president", "governor", "senator", "lawmaker", "judge", "magistrate",
+    "general", "colonel", "admiral", "mayor", "police chief", "commissioner",
+    "chief executive", "bank", "central bank", "port", "customs", "army", "navy",
+    "intelligence", "ministry", "parliament", "congress", "supreme court",
+    "ministro", "presidente", "gobernador", "senador", "diputado", "juez", "alcalde",
+    "general", "aduana", "puerto", "banco", "fiscalía", "ejército",
+    "ministre", "juge", "maire", "banque", "douane", "port", "armée",
+    "minister", "richter", "bürgermeister", "bank", "zoll", "hafen",
+    "ministro", "giudice", "sindaco", "banca", "dogana", "porto",
+    "minister", "rechter", "burgemeester", "bank", "douane", "haven",
+    "министр", "губернатор", "судья", "генерал", "мэр", "банк", "таможн", "депутат",
+    "وزير", "قاض", "بنك", "جمارك", "نائب", "bakan", "hakim", "banka", "gümrük",
+    "menteri", "bupati", "hakim", "bank", "waziri", "jaji", "benki",
 ]
-INSTITUTION = [
-    # non-English institutional terms, so the gate does not silently drop every
-    # non-English item the multilingual searches bring in
-    "funcionario", "policía", "policia", "aduana", "aduanero", "fiscal", "juez", "ministro",
-    "banco", "puerto", "detenido", "condenado", "imputado", "alfândega", "delegado",
-    "douane", "procureur", "juge", "ministre", "banque", "gendarme", "magistrat", "banquier",
-    "beamter", "beamten", "staatsanwalt", "zoll", "hafen", "polizei", "bankier",
-    "funzionario", "procura", "dogana", "porto", "poliziotto", "banca",
-    "ambtenaar", "haven", "полиц", "таможн", "прокур", "чиновник", "банк",
-    "ضابط", "شرطة", "جمارك", "بنك", "polis", "gümrük", "savcı", "banka", "memur",
-    "pejabat", "polisi", "bea cukai", "afisa", "polisi ya",
-    "official", "officer", "police", "customs", "minister", "mayor", "governor", "senator",
-    "congress", "judge", "prosecutor", "magistrate", "general", "colonel", "army", "navy",
-    "border guard", "bank", "banker", "regulator", "port", "airport", "company", "firm",
-    "executive", "lawyer", "notary", "casino", "exchange", "indicted", "indictment",
-    "convicted", "conviction", "sentenced", "pleaded guilty", "charged", "arrested",
-    "extradited", "sanctioned", "ofac", "fined", "penalty", "raid", "seized", "forfeiture",
-    "investigation", "corruption", "bribe", "bribery", "complicity", "protection",
-]
+
+MIN_SIG_STRONG  = 7   # anchor + actor + an explicit capture predicate
+MIN_SIG_WEAK    = 8   # anchor + role + an outcome verb standing next to that role
+MIN_SIG_TRUSTED = 5   # publications whose whole output is this subject
+
+RX_ANCHOR   = _rx(ANCHOR)
+RX_ROLE     = _rx(ROLE)
+RX_ORG      = _rx(ORG)
+RX_STRONG   = _rx(CAPTURE_STRONG)
+RX_WEAK     = _rx(CAPTURE_WEAK)
+RX_VETO     = _rx(VETO)
+RX_HIGH     = _rx(HIGH_OFFICE)
+
+
+def clean(t):
+    t = html.unescape(t or "")
+    t = re.sub(r"<[^>]+>", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _role_spans(text):
+    """Role matches that are not merely part of a bare enforcing body.
+
+    "police officer sentenced" carries a defendant-capable role; "police arrested
+    three" carries only the force. Both contain the word police, so a role match is
+    kept only when it is not wholly inside an ENFORCER_ONLY match.
+    """
+    bodies = [(m.start(), m.end()) for m in ENFORCER_ONLY.finditer(text)]
+    out = []
+    for m in RX_ROLE.finditer(text):
+        if not any(a <= m.start() and m.end() <= b for a, b in bodies):
+            out.append(m.start())
+    return out
+
+
+def gate(title, summary, trusted=False):
+    """Return (sig, why). sig 0 means the item does not belong on this wire.
+
+    Three parts, all required: an illicit-economy anchor, an institutional actor, and
+    a predicate saying that actor is implicated. The weak path exists because a
+    judicial outcome standing beside a role — "former customs officer sentenced" — is
+    itself the allegation. It has to stand beside the role: an outcome verb next to a
+    bare police force is a bust report, which is not what this map is about.
+    """
+    text = (title + " . " + summary).lower()
+    if RX_VETO.search(text):
+        return 0, "veto"
+    if not RX_ANCHOR.search(text):
+        return 0, "no anchor"
+
+    roles = _role_spans(text)
+    has_org = bool(RX_ORG.search(text))
+    if not roles and not has_org and not trusted:
+        return 0, "no actor"
+
+    tl = title.lower()
+    def n(rx, hay):
+        return len({m.group(0).lower() for m in rx.finditer(hay)})
+    s  = 3 * min(n(RX_ANCHOR, text), 2)        # the illicit economy
+    s += 4 * min(n(RX_STRONG, text), 2)        # the capture predicate
+    s += 2 if roles else 0
+    s += 1 if has_org else 0
+    s += 2 * min(n(RX_HIGH, text), 2)          # how high the institution sits
+    s += 2 if RX_ANCHOR.search(tl) else 0      # in the headline, so it is the subject
+    s += 2 if RX_STRONG.search(tl) else 0
+    s += 3 if trusted else 0                   # the publication is the subject
+    s  = min(s, 20)
+
+    if RX_STRONG.search(text):
+        return (s, "capture") if s >= MIN_SIG_STRONG else (0, "capture/low")
+    if roles and any(abs(m.start() - p) <= 70 for m in RX_WEAK.finditer(text) for p in roles):
+        return (s, "role+outcome") if s >= MIN_SIG_WEAK else (0, "outcome/low")
+    if trusted and s >= MIN_SIG_TRUSTED and (RX_STRONG.search(text) or RX_WEAK.search(text)):
+        return s, "trusted source"
+    return 0, "no capture predicate"
+
 
 # ------------------------------------------------------- geo tagging (ISO3 map)
 COUNTRIES = {
@@ -275,124 +536,163 @@ ALIASES = {
 WEAK_ALIAS = {"dea", "fincen", "ofac ", "justice department", "southern district",
               "eastern district", "us ", "american"}
 
-WORD = re.compile(r"[a-z][a-z\.\s'-]+")
 
-
-def clean(t):
-    t = html.unescape(t or "")
-    t = re.sub(r"<[^>]+>", " ", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-
-def signal(text):
-    """Keyword strength. Returns 0 when the item is off-topic or explicitly excluded."""
-    low = " " + text.lower() + " "
-    for d in DROP:
-        if d in low:
-            return 0
-    if not any(a in low for a in ANCHOR):
-        return 0
-    if not any(i in low for i in INSTITUTION):
-        return 0
-    s = 0
-    for k, w in KEEP.items():
-        if k in low:
-            s += w
-    return min(s, 20)
+# Aliases are matched on word boundaries too. Under the old substring match "cali"
+# scored inside "California" and "us " inside any word ending in us.
+_ALIAS_RX = {a: _rx([a.strip()]) for a in ALIASES}
+_NAME_RX  = {iso: _rx([n[0].lower().split(",")[0]]) for iso, n in COUNTRIES.items()
+             if len(n[0].split(",")[0]) > 3}
 
 
 def geotag(text, default_iso=""):
-    """Longest-match wins, and an explicit country name beats a demonym or city."""
+    """Longest match wins; a formal country name outranks a demonym or a city."""
     low = " " + text.lower() + " "
     best, best_len = "", 0
-    for iso, (name, _r, _s) in COUNTRIES.items():
-        n = name.lower().split(",")[0]
-        if len(n) > 3 and n in low and len(n) > best_len:
-            best, best_len = iso, len(n) + 5     # bonus: formal name outranks an alias
-    for alias, iso in ALIASES.items():
-        if alias not in low:
+    for iso, rx in _NAME_RX.items():
+        if rx.search(low):
+            n = len(COUNTRIES[iso][0].split(",")[0]) + 5
+            if n > best_len:
+                best, best_len = iso, n
+    for alias, rx in _ALIAS_RX.items():
+        if not rx.search(low):
             continue
-        score = len(alias) - (6 if alias in WEAK_ALIAS else 0)
+        score = len(alias.strip()) - (6 if alias in WEAK_ALIAS else 0)
         if score > best_len:
-            best, best_len = iso, score
+            best, best_len = ALIASES[alias], score
     return best or default_iso
 
 
-def gnews(q, lang="en"):
-    hl = {"en": "en-US", "es": "es-419", "fr": "fr", "pt": "pt-BR"}.get(lang, "en-US")
-    ceid = {"en": "US:en", "es": "US:es-419", "fr": "FR:fr", "pt": "BR:pt-419"}.get(lang, "US:en")
-    gl = ceid.split(":")[0]
+def gnews(q, hl="en-US", gl="US", ceid="US:en"):
     return ("https://news.google.com/rss/search?q=%s&hl=%s&gl=%s&ceid=%s"
             % (quote_plus(q), hl, gl, ceid))
 
 
-def parse(url, src_name, lang, default_iso=""):
-    out = []
-    try:
-        d = feedparser.parse(url, agent=UA)
-    except Exception as e:
-        print("  ! %s: %s" % (src_name, e))
-        return out
+def fetch(url, tries=2):
+    """feedparser with one retry. Google News throttles a burst of requests."""
+    last = None
+    for n in range(tries):
+        try:
+            d = feedparser.parse(url, agent=UA)
+            if getattr(d, "entries", None):
+                return d
+            last = "empty"
+        except Exception as e:
+            last = str(e)[:90]
+        time.sleep(1.5 + random.random() * 1.5)
+    return last
+
+
+def read_source(src):
+    """One source -> (name, list of items, note). Runs on a worker thread."""
+    name, url = src["name"], src["url"]
+    lang, default_iso = src.get("lang", "en"), src.get("iso", "")
+    trusted = bool(src.get("trusted"))
+    d = fetch(url)
+    if not hasattr(d, "entries"):
+        return name, [], "unreachable (%s)" % d
+    out, seen_gate = [], 0
     for e in d.entries:
         title = clean(getattr(e, "title", ""))
         link = getattr(e, "link", "") or ""
         if not title or not link:
             continue
         summary = clean(getattr(e, "summary", ""))[:240]
-        # Google News appends " - Publisher" to the headline; lift it out as the source
-        src = src_name
-        m = re.search(r"\s+-\s+([^-]{2,40})$", title)
-        if src_name == "Google News":
+        source = name
+        if src.get("kind") == "gnews":
+            # Google News appends " - Publisher" to the headline; lift it out
             if getattr(e, "source", None) and getattr(e.source, "title", None):
-                src = clean(e.source.title)
-            elif m:
-                src = m.group(1).strip()
-                title = title[: m.start()].strip()
-        blob = title + " " + summary
-        sig = signal(blob)
-        if sig < MIN_SIG:
+                source = clean(e.source.title)
+            else:
+                m = re.search(r"\s+-\s+([^-]{2,40})$", title)
+                if m:
+                    source = m.group(1).strip()
+                    title = title[: m.start()].strip()
+        sig, why = gate(title, summary, trusted)
+        if not sig:
+            seen_gate += 1
             continue
         t = getattr(e, "published_parsed", None) or getattr(e, "updated_parsed", None)
         dt = (datetime.fromtimestamp(time.mktime(t), tz=timezone.utc)
               if t else datetime.now(timezone.utc))
         if datetime.now(timezone.utc) - dt > timedelta(days=MAX_AGE_DAYS):
             continue
-        iso = geotag(blob, default_iso)
-        name, region, sub = COUNTRIES.get(iso, ("", "", ""))
+        iso = geotag(title + " " + summary, default_iso)
+        cname, region, sub = COUNTRIES.get(iso, ("", "", ""))
         out.append({
             "title": title, "link": link,
             "date": dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "source": src or urlparse(link).netloc,
-            "iso": iso, "country": name, "region": region, "subregion": sub,
-            "snippet": summary, "lang": lang, "sig": sig,
+            "source": source or urlparse(link).netloc,
+            "iso": iso, "country": cname, "region": region,
+            "subregion": sub, "subs": sub,
+            "snippet": summary, "lang": lang, "sig": sig, "why": why, "v": 2,
         })
+    return name, out, "%d kept, %d off subject" % (len(out), seen_gate)
+
+
+def build_sources(cfg):
+    """Flatten feeds.json into one list of fetchable sources."""
+    qs, out = cfg.get("query_sets", {}), []
+    for ed in cfg.get("editions", []):
+        lang = ed.get("lang", "en")
+        for i, q in enumerate(qs.get(lang, qs.get("en", []))):
+            out.append({"name": "GN %s/%s #%d" % (ed["gl"], lang, i + 1),
+                        "url": gnews(q, ed.get("hl", "en-US"), ed["gl"], ed["ceid"]),
+                        "lang": lang, "iso": ed.get("iso", ""), "kind": "gnews"})
+    for i, s in enumerate(cfg.get("searches", [])):
+        lang = s.get("lang", "en")
+        out.append({"name": "GN global #%d" % (i + 1),
+                    "url": gnews(s["q"], s.get("hl", "en-US"), s.get("gl", "US"),
+                                 s.get("ceid", "US:en")),
+                    "lang": lang, "iso": s.get("iso", ""), "kind": "gnews"})
+    for f in cfg.get("feeds", []):
+        out.append(dict(f, kind="feed"))
     return out
 
 
 def main():
     cfg = json.load(open("feeds.json"))
-    items = []
-    for s in cfg.get("searches", []):
-        lang = s.get("lang", "en")
-        print("· search: %s" % s["q"])
-        items += parse(gnews(s["q"], lang), "Google News", lang, s.get("iso", ""))
-    for f in cfg.get("feeds", []):
-        print("· feed:   %s" % f["name"])
-        items += parse(f["url"], f["name"], f.get("lang", "en"), f.get("iso", ""))
+    sources = build_sources(cfg)
+    print("reading %d sources with %d workers\n" % (len(sources), WORKERS))
 
-    # de-duplicate on a normalised headline, keeping the highest-signal copy
+    items, report = [], []
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for name, got, note in ex.map(read_source, sources):
+            items += got
+            report.append((name, len(got), note))
+
+    # de-duplicate on a normalised headline and on the bare URL, keeping the
+    # highest-signal copy. The same story arrives from several country editions.
     seen = {}
     for it in items:
-        k = hashlib.sha1(re.sub(r"[^a-z0-9]+", " ",
-                                it["title"].lower())[:110].encode()).hexdigest()
-        if k not in seen or it["sig"] > seen[k]["sig"]:
+        u = urlparse(it["link"])
+        norm = re.sub(r"\s+-\s+[^-]{2,40}$", "", it["title"]).lower()
+        keys = [hashlib.sha1(re.sub(r"[^a-z0-9]+", " ", norm)[:110].encode()).hexdigest(),
+                (u.netloc + u.path).lower()]
+        prev = [k for k in keys if k in seen]
+        if prev and seen[prev[0]]["sig"] >= it["sig"]:
+            continue
+        for k in keys:
             seen[k] = it
-    out = sorted(seen.values(), key=lambda x: x["date"], reverse=True)[:MAX_ITEMS]
+    uniq = {id(v): v for v in seen.values()}.values()
+    out = sorted(uniq, key=lambda x: x["date"], reverse=True)[:MAX_ITEMS]
 
     json.dump(out, open("wire.json", "w"), ensure_ascii=False, indent=1)
+
+    dead = [r for r in report if "unreachable" in r[2]]
+    for name, n, note in sorted(report, key=lambda r: -r[1])[:25]:
+        print("  %-22s %s" % (name, note))
+    if dead:
+        print("\nunreachable, prune or replace these in feeds.json:")
+        for name, _n, note in dead:
+            print("  %-22s %s" % (name, note))
+
     tagged = sum(1 for i in out if i["iso"])
-    print("\n%d items -> wire.json  (%d geo-tagged, %d untagged)"
-          % (len(out), tagged, len(out) - tagged))
+    paths = {}
+    for i in out:
+        paths[i["why"]] = paths.get(i["why"], 0) + 1
+    print("\n%d items -> wire.json  (%d geo-tagged, %d untagged, %d countries)"
+          % (len(out), tagged, len(out) - tagged, len({i["iso"] for i in out if i["iso"]})))
+    print("gate paths: " + ", ".join("%s %d" % kv for kv in sorted(paths.items())))
     if out:
         print("newest: %s  %s" % (out[0]["date"], out[0]["title"][:70]))
 

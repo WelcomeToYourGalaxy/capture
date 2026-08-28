@@ -1763,7 +1763,7 @@ function flyTo(k){
 
    Item contract, one object per story:
      { title, link, date (ISO 8601), source, iso (ISO3), country, region, subs,
-       lang, sig (0-10), snippet }
+       lang, sig (0-20), why (which gate path passed it), v (gate version), snippet }
 --------------------------------------------------------------------------------- */
 var WIRE_ARCHIVE_URL = 'wire.json';
 var WIRE_ARCHIVE_ALT = 'https://welcometoyourgalaxy.github.io/capture-wire/wire.json';
@@ -1772,17 +1772,22 @@ var _wireAll=[], _wireIso='', _wireAge='', _wireLang='';
 
 /* A second net, applied in the page. The archive is produced by a harvester that can be
    older than this file, and a stale or loosely-tuned wire.json used to put health-care
-   fraud indictments and excessive-force cases in a drug-underworld feed. An item has to
-   carry an illicit-economy anchor AND an institutional term, in any of the languages the
-   harvester collects, or it does not render here whatever the archive says. */
+   fraud indictments, routine seizures and a Miami Vice listing in a drug-underworld feed.
+
+   Items carrying v>=2 were written by the three-part gate in harvest_wire.py — illicit
+   economy, institutional actor, capture predicate — and are not second-guessed here, or
+   the page would silently drop the non-English items that gate is built to keep. Older
+   items still face the original anchor-plus-institution test. The veto list runs over
+   everything, whatever wrote it. */
 var W_ANCHOR = [
  'cartel','narco','traffick','cocaine','heroin','fentanyl','methamphetamine','captagon',
  'opium','opioid','precursor','money launder','launder','organised crime','organized crime',
  'mafia','kingpin','drug ring','drug network','drug gang','drug trade','drug lord','narcotic',
  'cártel','cartel de','narcotráfico','tráfico de drogas','blanqueo','lavado de dinero','cocaína',
  'trafic de drogue','blanchiment','stupéfiants','tráfico de droga','lavagem de dinheiro',
- 'drogenhandel','geldwäsche','kokain','traffico di droga','riciclaggio','drugshandel','witwassen',
- 'наркотик','отмывание','уйгур','مخدرات','كبتاجون','تهريب','uyuşturucu','kaçakçılık'
+ 'drogenhandel','drogenhändler','geldwäsche','kokain','traffico di droga','riciclaggio',
+ 'drugshandel','witwassen','наркотик','наркоторгов','отмывание','مخدرات','كبتاجون','تهريب',
+ 'uyuşturucu','kaçakçılık','narkoba','dawa za kulevya'
 ];
 var W_INST = [
  'official','officer','police','customs','minister','mayor','governor','senator','congress',
@@ -1791,23 +1796,28 @@ var W_INST = [
  'plead','charged','arrest','extradit','sanction','fine','penalty','raid','seiz','forfeit',
  'bribe','briber','complicit','cartel','funcionario','policía','aduana','fiscal','juez',
  'ministro','banco','puerto','detenido','condenado','imputado','douane','procureur','juge',
- 'ministre','banque','port','police','beamter','staatsanwalt','zoll','hafen','polizei',
- 'funzionario','procura','dogana','porto','полиц','таможн','прокур','суд','ضابط','شرطة','جمارك',
- 'polis','gümrük','savcı','banquier','mis en examen','gendarme','magistrat','entreprise',
- 'société','bancario','empresa','aduanero','alfândega','delegado','beamten','unternehmen',
- 'bankier','ambtenaar','haven','banca','impresa','poliziotto','банк','чиновник','مصرف','بنك',
- 'banka','memur','pejabat','polisi','bea cukai'
+ 'ministre','banque','beamter','staatsanwalt','zoll','hafen','polizei','funzionario','procura',
+ 'dogana','porto','полиц','таможн','прокур','суд','ضابط','شرطة','جمارك','polis','gümrük',
+ 'savcı','banquier','mis en examen','gendarme','magistrat','entreprise','société','bancario',
+ 'empresa','aduanero','alfândega','delegado','beamten','unternehmen','bankier','ambtenaar',
+ 'haven','banca','impresa','poliziotto','банк','чиновник','مصرف','بنك','banka','memur',
+ 'pejabat','polisi','bea cukai'
 ];
 var W_VETO = [
  'health care fraud','healthcare fraud','medicare','medicaid','excessive force','civil rights',
  'wire fraud scheme','ponzi','tax fraud','insider trading','identity theft','child support',
- 'immigration status','human smuggling only','fda approves','clinical trial','drug shortage',
- 'drugmaker','pharma','prescription','weight loss drug','opioid settlement payout',
- 'transfer window','box office','horoscope','recipe'
+ 'fda approves','clinical trial','drug shortage','drugmaker','pharma','prescription',
+ 'weight loss drug','opioid settlement','rehab centre','rehab center','addiction treatment',
+ 'corrupción en miami','miami vice','netflix','hbo','prime video','season','episode','trailer',
+ 'box office','biopic','streaming','starring','temporada','capítulo','estreno','película',
+ 'telenovela','episódio','saison','épisode','staffel','stagione','videojuego','video game',
+ 'leaving to join','joins as','appointed','named as','steps down','stepping down','sworn in',
+ 'nominated','obituary','transfer window','horoscope','recipe'
 ];
 function _wireTopical(it){
   var s=((it.title||'')+' '+(it.snippet||'')).toLowerCase();
   for(var v=0;v<W_VETO.length;v++){ if(s.indexOf(W_VETO[v])>=0) return false; }
+  if((it.v||0)>=2) return true;              /* gated by the harvester already */
   var a=false,i;
   for(i=0;i<W_ANCHOR.length;i++){ if(s.indexOf(W_ANCHOR[i])>=0){ a=true; break; } }
   if(!a) return false;
@@ -1817,7 +1827,7 @@ function _wireTopical(it){
 var LANGNAME={en:'English',es:'Spanish',fr:'French',pt:'Portuguese',de:'German',it:'Italian',
               nl:'Dutch',ru:'Russian',ar:'Arabic',tr:'Turkish',id:'Indonesian',sw:'Swahili'};
 
-function _wireSave(items){ try{ localStorage.setItem(WIRE_LS, JSON.stringify(items.slice(0,400))); }catch(e){} }
+function _wireSave(items){ try{ localStorage.setItem(WIRE_LS, JSON.stringify(items.slice(0,600))); }catch(e){} }
 function _wireLoad(){ try{ var v=localStorage.getItem(WIRE_LS); return v?JSON.parse(v):[]; }catch(e){ return []; } }
 function _ts(it){ var d=Date.parse(it.date||''); return isFinite(d)?d:0; }
 function ago(ms){
@@ -1877,14 +1887,15 @@ function _wireRender(){
       'applies its own subject gate and will not render items that fail it.</div>'; return;
   }
   var h='';
-  items.slice(0,80).forEach(function(it){
+  items.slice(0,200).forEach(function(it){
     var place=[it.subs,it.country].filter(Boolean).join(', ');
     h+='<div class="wi"><a href="'+(it.link||'#')+'" target="_blank" rel="noopener">'+
        String(it.title||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</a>'+
        (it.snippet?('<div class="ws">'+String(it.snippet).replace(/&/g,'&amp;').replace(/</g,'&lt;').slice(0,190)+'</div>'):'')+
        '<div class="wm"><b>'+(it.source||'source unknown')+'</b>'+
        (place?(' &middot; '+place):'')+(_ts(it)?(' &middot; '+ago(_ts(it))):'')+
-       (typeof it.sig==='number'?(' &middot; sig '+it.sig):'')+'</div></div>';
+       (typeof it.sig==='number'?(' &middot; sig '+it.sig):'')+
+       (it.why?(' &middot; '+String(it.why).replace(/</g,'&lt;')):'')+'</div></div>';
   });
   body.innerHTML=h;
 }

@@ -1,126 +1,210 @@
 {
-  "_comment": "Sources for the Live Drug Underworld Map wire. 'q' entries become Google News RSS searches in the given language; 'url' entries are read directly. The blanket DOJ press-release feed was removed: it is a firehose of every federal indictment in the United States, and health-care fraud and excessive-force cases were reaching the wire through it. Narcotics prosecutions still arrive via the English searches, which carry the same DOJ releases when they are on topic.",
-  "searches": [
-    {
-      "q": "drug cartel corruption official arrested"
-    },
-    {
-      "q": "police officer convicted drug trafficking bribe"
-    },
-    {
-      "q": "money laundering bank drug proceeds penalty"
-    },
-    {
-      "q": "customs officer cocaine port arrested"
-    },
-    {
-      "q": "narco politics indictment minister"
-    },
-    {
-      "q": "judge prosecutor bribed trafficking case"
-    },
-    {
-      "q": "captagon network officials seizure"
-    },
-    {
-      "q": "fentanyl precursor indictment company"
-    },
-    {
-      "q": "junket casino money laundering penalty"
-    },
-    {
-      "q": "cartel narcotrafico funcionario detenido",
-      "lang": "es"
-    },
-    {
-      "q": "policia corrupcion narcotrafico soborno",
-      "lang": "es"
-    },
-    {
-      "q": "lavado de dinero banco narcotrafico",
-      "lang": "es"
-    },
-    {
-      "q": "policier corruption trafic de drogue",
-      "lang": "fr"
-    },
-    {
-      "q": "blanchiment banque trafic stupefiants",
-      "lang": "fr"
-    },
-    {
-      "q": "policia corrupcao trafico apreensao",
-      "lang": "pt"
-    },
-    {
-      "q": "lavagem de dinheiro trafico banco",
-      "lang": "pt"
-    },
-    {
-      "q": "Drogenhandel Korruption Beamter Geldwaesche",
-      "lang": "de"
-    },
-    {
-      "q": "traffico di droga corruzione funzionario riciclaggio",
-      "lang": "it"
-    },
-    {
-      "q": "drugshandel corruptie douane witwassen",
-      "lang": "nl"
-    },
-    {
-      "q": "наркотрафик коррупция чиновник отмывание",
-      "lang": "ru"
-    },
-    {
-      "q": "تهريب مخدرات فساد ضابط",
-      "lang": "ar"
-    },
-    {
-      "q": "كبتاجون ضبط شبكة تهريب",
-      "lang": "ar"
-    },
-    {
-      "q": "uyusturucu kacakciligi rusvet polis",
-      "lang": "tr"
-    },
-    {
-      "q": "narkoba korupsi polisi bea cukai",
-      "lang": "id"
-    },
-    {
-      "q": "dawa za kulevya rushwa polisi",
-      "lang": "sw"
-    }
+  "_comment": "Sources for the Live Drug Underworld Map wire. Three blocks. 'editions' are Google News country editions — each is read in its own language using the query set named by its lang, and an item from an edition falls back to that country when nothing in the text geo-tags it. 'searches' are global queries not tied to a country. 'feeds' are read directly; 'trusted' marks a publication whose whole output is on subject, which lowers the score an item from it needs to clear. Google News ANDs every bare word in a query, so every query here is written as parenthesised OR groups — one illicit-economy group, one capture group. The first build used flat five-word strings, which is why it returned eight items.",
+
+  "query_sets": {
+    "en": [
+      "(cartel OR narco OR \"drug trafficking\" OR cocaine OR fentanyl OR heroin OR captagon OR \"organised crime\" OR \"organized crime\") (bribe OR bribery OR corruption OR collusion OR complicity OR protection OR infiltrated)",
+      "(\"money laundering\" OR \"drug money\" OR \"criminal proceeds\") (bank OR banker OR casino OR broker OR company OR executive OR regulator OR fined OR penalty OR sanctioned)",
+      "(cartel OR narco OR \"drug trafficking\" OR cocaine OR fentanyl) (police OR officer OR customs OR \"border guard\" OR soldier OR general OR judge OR prosecutor OR mayor OR minister OR lawmaker) (convicted OR indicted OR sentenced OR charged OR dismissed)"
+    ],
+    "es": [
+      "(narcotráfico OR cártel OR cocaína OR \"crimen organizado\") (soborno OR cohecho OR corrupción OR complicidad OR protección OR infiltración)",
+      "(\"lavado de dinero\" OR \"lavado de activos\" OR \"blanqueo de capitales\") (banco OR empresa OR casino OR funcionario OR sancionado OR multa)",
+      "(narcotráfico OR cártel OR cocaína) (policía OR aduana OR militar OR juez OR fiscal OR alcalde OR ministro OR diputado) (detenido OR condenado OR imputado OR destituido OR vinculado)"
+    ],
+    "pt": [
+      "(\"tráfico de drogas\" OR narcotráfico OR cocaína OR \"crime organizado\") (suborno OR propina OR corrupção OR conivência OR proteção OR infiltração)",
+      "(\"lavagem de dinheiro\" OR \"lavagem de capitais\") (banco OR empresa OR delegado OR funcionário OR multa OR sancionado)",
+      "(\"tráfico de drogas\" OR facção OR milícia) (policial OR delegado OR juiz OR promotor OR prefeito OR deputado OR alfândega) (condenado OR indiciado OR preso OR afastado)"
+    ],
+    "fr": [
+      "(\"trafic de drogue\" OR \"trafic de stupéfiants\" OR cocaïne OR \"crime organisé\") (corruption OR complicité OR protection OR infiltration)",
+      "(\"blanchiment d'argent\" OR blanchiment) (banque OR entreprise OR casino OR notaire OR sanction OR amende)",
+      "(\"trafic de drogue\" OR narcotrafic) (policier OR gendarme OR douanier OR juge OR procureur OR maire OR ministre) (condamné OR \"mis en examen\" OR révoqué)"
+    ],
+    "de": [
+      "(Drogenhandel OR Kokain OR \"organisierte Kriminalität\" OR Drogenkartell) (Korruption OR Bestechung OR Beihilfe OR unterwandert)",
+      "(Geldwäsche OR Drogengeld) (Bank OR Unternehmen OR Beamter OR Strafe OR sanktioniert)",
+      "(Drogenhandel OR Kokain) (Polizist OR Zollbeamter OR Richter OR Staatsanwalt OR Bürgermeister OR Minister) (verurteilt OR angeklagt OR entlassen)"
+    ],
+    "it": [
+      "(\"traffico di droga\" OR cocaina OR narcotraffico OR mafia OR ndrangheta OR camorra) (corruzione OR tangente OR complicità OR protezione OR infiltrazione)",
+      "(riciclaggio OR \"denaro sporco\") (banca OR azienda OR casinò OR funzionario OR multa OR sanzione)",
+      "(\"traffico di droga\" OR narcotraffico) (poliziotto OR carabiniere OR doganiere OR giudice OR magistrato OR sindaco OR ministro) (condannato OR indagato OR rimosso)"
+    ],
+    "nl": [
+      "(drugshandel OR cocaïne OR \"georganiseerde misdaad\" OR ondermijning) (corruptie OR omkoping OR medeplichtig OR bescherming OR infiltratie)",
+      "(witwassen OR drugsgeld) (bank OR bedrijf OR notaris OR ambtenaar OR boete OR sanctie)",
+      "(drugshandel OR cocaïne) (agent OR politieman OR douanier OR rechter OR burgemeester OR minister) (veroordeeld OR verdacht OR ontslagen)"
+    ],
+    "ru": [
+      "(наркотрафик OR наркоторговля OR кокаин OR \"организованная преступность\") (коррупция OR взятка OR крышевание OR пособничество)",
+      "(\"отмывание денег\" OR наркодоходы) (банк OR компания OR чиновник OR штраф OR санкции)",
+      "(наркотрафик OR наркоторговля) (полицейский OR таможенник OR судья OR прокурор OR мэр OR министр) (осуждён OR обвинён OR уволен)"
+    ],
+    "uk": [
+      "(наркотрафік OR наркоторгівля OR кокаїн OR \"організована злочинність\") (корупція OR хабар OR кришування OR пособництво)",
+      "(\"відмивання грошей\") (банк OR компанія OR посадовець OR штраф OR санкції)",
+      "(наркотрафік OR наркоторгівля) (поліцейський OR митник OR суддя OR прокурор OR мер OR міністр) (засуджений OR підозра OR звільнений)"
+    ],
+    "ar": [
+      "(\"تهريب المخدرات\" OR الكبتاجون OR الكوكايين OR \"الجريمة المنظمة\") (فساد OR رشوة OR تواطؤ OR حماية OR اختراق)",
+      "(\"غسل الأموال\" OR \"أموال المخدرات\") (بنك OR مصرف OR شركة OR مسؤول OR عقوبات OR غرامة)",
+      "(\"تهريب المخدرات\" OR المخدرات) (ضابط OR شرطة OR جمارك OR قاض OR نائب OR وزير) (إدانة OR اتهام OR إقالة)"
+    ],
+    "tr": [
+      "(\"uyuşturucu kaçakçılığı\" OR kokain OR \"organize suç\") (rüşvet OR yolsuzluk OR koruma OR sızma)",
+      "(\"kara para aklama\") (banka OR şirket OR memur OR ceza OR yaptırım)",
+      "(\"uyuşturucu kaçakçılığı\") (polis OR gümrük OR hakim OR savcı OR belediye OR bakan) (tutuklandı OR mahkum OR görevden)"
+    ],
+    "id": [
+      "(\"peredaran narkoba\" OR narkoba OR sabu OR \"kejahatan terorganisir\") (suap OR korupsi OR bekingan OR perlindungan)",
+      "(\"pencucian uang\" OR TPPU) (bank OR perusahaan OR pejabat OR denda OR sanksi)",
+      "(narkoba OR sabu) (polisi OR \"bea cukai\" OR hakim OR jaksa OR bupati OR menteri) (divonis OR tersangka OR dipecat)"
+    ],
+    "sw": [
+      "(\"dawa za kulevya\" OR heroini OR kokeini) (rushwa OR ufisadi OR ulinzi OR ushirikiano)",
+      "(\"utakatishaji fedha\") (benki OR kampuni OR afisa OR faini)",
+      "(\"dawa za kulevya\") (polisi OR forodha OR jaji OR mbunge OR waziri) (kukamatwa OR kuhukumiwa OR kufukuzwa)"
+    ],
+    "el": [
+      "(\"διακίνηση ναρκωτικών\" OR κοκαΐνη OR \"οργανωμένο έγκλημα\") (διαφθορά OR δωροδοκία OR συνέργεια OR προστασία)",
+      "(\"ξέπλυμα χρήματος\") (τράπεζα OR εταιρεία OR αξιωματούχος OR πρόστιμο)"
+    ],
+    "pl": [
+      "(\"handel narkotykami\" OR kokaina OR \"zorganizowana przestępczość\") (korupcja OR łapówka OR współudział OR ochrona)",
+      "(\"pranie pieniędzy\") (bank OR firma OR urzędnik OR kara OR sankcje)"
+    ],
+    "ro": [
+      "(\"trafic de droguri\" OR cocaină OR \"crimă organizată\") (corupție OR mită OR complicitate OR protecție)",
+      "(\"spălare de bani\") (bancă OR companie OR funcționar OR amendă OR sancțiuni)"
+    ],
+    "sr": [
+      "(\"трговина дрогом\" OR кокаин OR \"организовани криминал\") (корупција OR мито OR саучесништво OR заштита)",
+      "(\"прање новца\") (банка OR компанија OR функционер OR казна)"
+    ],
+    "sv": [
+      "(narkotikahandel OR kokain OR \"organiserad brottslighet\") (korruption OR muta OR delaktighet OR skydd)",
+      "(penningtvätt OR narkotikapengar) (bank OR bolag OR tjänsteman OR böter OR sanktioner)"
+    ],
+    "th": [
+      "(\"ค้ายาเสพติด\" OR ยาบ้า OR โคเคน) (ทุจริต OR สินบน OR คุ้มครอง)",
+      "(\"ฟอกเงิน\") (ธนาคาร OR บริษัท OR เจ้าหน้าที่ OR ปรับ)"
+    ],
+    "vi": [
+      "(\"buôn bán ma túy\" OR \"ma túy\" OR cocaine) (hối lộ OR tham nhũng OR bao che OR tiếp tay)",
+      "(\"rửa tiền\") (ngân hàng OR công ty OR cán bộ OR phạt)"
+    ],
+    "he": [
+      "(\"סחר בסמים\" OR קוקאין OR \"פשע מאורגן\") (שוחד OR שחיתות OR חסות)",
+      "(\"הלבנת הון\") (בנק OR חברה OR פקיד OR קנס)"
+    ]
+  },
+
+  "editions": [
+    {"iso": "USA", "hl": "en-US",  "gl": "US", "ceid": "US:en",      "lang": "en"},
+    {"iso": "GBR", "hl": "en-GB",  "gl": "GB", "ceid": "GB:en",      "lang": "en"},
+    {"iso": "CAN", "hl": "en-CA",  "gl": "CA", "ceid": "CA:en",      "lang": "en"},
+    {"iso": "AUS", "hl": "en-AU",  "gl": "AU", "ceid": "AU:en",      "lang": "en"},
+    {"iso": "NZL", "hl": "en-NZ",  "gl": "NZ", "ceid": "NZ:en",      "lang": "en"},
+    {"iso": "IRL", "hl": "en-IE",  "gl": "IE", "ceid": "IE:en",      "lang": "en"},
+    {"iso": "IND", "hl": "en-IN",  "gl": "IN", "ceid": "IN:en",      "lang": "en"},
+    {"iso": "PAK", "hl": "en-PK",  "gl": "PK", "ceid": "PK:en",      "lang": "en"},
+    {"iso": "PHL", "hl": "en-PH",  "gl": "PH", "ceid": "PH:en",      "lang": "en"},
+    {"iso": "SGP", "hl": "en-SG",  "gl": "SG", "ceid": "SG:en",      "lang": "en"},
+    {"iso": "MYS", "hl": "en-MY",  "gl": "MY", "ceid": "MY:en",      "lang": "en"},
+    {"iso": "ZAF", "hl": "en-ZA",  "gl": "ZA", "ceid": "ZA:en",      "lang": "en"},
+    {"iso": "NGA", "hl": "en-NG",  "gl": "NG", "ceid": "NG:en",      "lang": "en"},
+    {"iso": "GHA", "hl": "en-GH",  "gl": "GH", "ceid": "GH:en",      "lang": "en"},
+    {"iso": "KEN", "hl": "en-KE",  "gl": "KE", "ceid": "KE:en",      "lang": "en"},
+    {"iso": "MEX", "hl": "es-419", "gl": "MX", "ceid": "MX:es-419",  "lang": "es"},
+    {"iso": "COL", "hl": "es-419", "gl": "CO", "ceid": "CO:es-419",  "lang": "es"},
+    {"iso": "ECU", "hl": "es-419", "gl": "EC", "ceid": "EC:es-419",  "lang": "es"},
+    {"iso": "PER", "hl": "es-419", "gl": "PE", "ceid": "PE:es-419",  "lang": "es"},
+    {"iso": "BOL", "hl": "es-419", "gl": "BO", "ceid": "BO:es-419",  "lang": "es"},
+    {"iso": "CHL", "hl": "es-419", "gl": "CL", "ceid": "CL:es-419",  "lang": "es"},
+    {"iso": "ARG", "hl": "es-419", "gl": "AR", "ceid": "AR:es-419",  "lang": "es"},
+    {"iso": "PRY", "hl": "es-419", "gl": "PY", "ceid": "PY:es-419",  "lang": "es"},
+    {"iso": "URY", "hl": "es-419", "gl": "UY", "ceid": "UY:es-419",  "lang": "es"},
+    {"iso": "VEN", "hl": "es-419", "gl": "VE", "ceid": "VE:es-419",  "lang": "es"},
+    {"iso": "GTM", "hl": "es-419", "gl": "GT", "ceid": "GT:es-419",  "lang": "es"},
+    {"iso": "HND", "hl": "es-419", "gl": "HN", "ceid": "HN:es-419",  "lang": "es"},
+    {"iso": "SLV", "hl": "es-419", "gl": "SV", "ceid": "SV:es-419",  "lang": "es"},
+    {"iso": "NIC", "hl": "es-419", "gl": "NI", "ceid": "NI:es-419",  "lang": "es"},
+    {"iso": "CRI", "hl": "es-419", "gl": "CR", "ceid": "CR:es-419",  "lang": "es"},
+    {"iso": "PAN", "hl": "es-419", "gl": "PA", "ceid": "PA:es-419",  "lang": "es"},
+    {"iso": "DOM", "hl": "es-419", "gl": "DO", "ceid": "DO:es-419",  "lang": "es"},
+    {"iso": "ESP", "hl": "es",     "gl": "ES", "ceid": "ES:es",      "lang": "es"},
+    {"iso": "BRA", "hl": "pt-BR",  "gl": "BR", "ceid": "BR:pt-419",  "lang": "pt"},
+    {"iso": "PRT", "hl": "pt-PT",  "gl": "PT", "ceid": "PT:pt-150",  "lang": "pt"},
+    {"iso": "FRA", "hl": "fr",     "gl": "FR", "ceid": "FR:fr",      "lang": "fr"},
+    {"iso": "BEL", "hl": "fr",     "gl": "BE", "ceid": "BE:fr",      "lang": "fr"},
+    {"iso": "SEN", "hl": "fr",     "gl": "SN", "ceid": "SN:fr",      "lang": "fr"},
+    {"iso": "CIV", "hl": "fr",     "gl": "CI", "ceid": "CI:fr",      "lang": "fr"},
+    {"iso": "CMR", "hl": "fr",     "gl": "CM", "ceid": "CM:fr",      "lang": "fr"},
+    {"iso": "MAR", "hl": "fr",     "gl": "MA", "ceid": "MA:fr",      "lang": "fr"},
+    {"iso": "DEU", "hl": "de",     "gl": "DE", "ceid": "DE:de",      "lang": "de"},
+    {"iso": "AUT", "hl": "de",     "gl": "AT", "ceid": "AT:de",      "lang": "de"},
+    {"iso": "CHE", "hl": "de",     "gl": "CH", "ceid": "CH:de",      "lang": "de"},
+    {"iso": "ITA", "hl": "it",     "gl": "IT", "ceid": "IT:it",      "lang": "it"},
+    {"iso": "NLD", "hl": "nl",     "gl": "NL", "ceid": "NL:nl",      "lang": "nl"},
+    {"iso": "RUS", "hl": "ru",     "gl": "RU", "ceid": "RU:ru",      "lang": "ru"},
+    {"iso": "UKR", "hl": "uk",     "gl": "UA", "ceid": "UA:uk",      "lang": "uk"},
+    {"iso": "ARE", "hl": "ar",     "gl": "AE", "ceid": "AE:ar",      "lang": "ar"},
+    {"iso": "SAU", "hl": "ar",     "gl": "SA", "ceid": "SA:ar",      "lang": "ar"},
+    {"iso": "EGY", "hl": "ar",     "gl": "EG", "ceid": "EG:ar",      "lang": "ar"},
+    {"iso": "LBN", "hl": "ar",     "gl": "LB", "ceid": "LB:ar",      "lang": "ar"},
+    {"iso": "IRQ", "hl": "ar",     "gl": "IQ", "ceid": "IQ:ar",      "lang": "ar"},
+    {"iso": "TUR", "hl": "tr",     "gl": "TR", "ceid": "TR:tr",      "lang": "tr"},
+    {"iso": "IDN", "hl": "id",     "gl": "ID", "ceid": "ID:id",      "lang": "id"},
+    {"iso": "TZA", "hl": "sw",     "gl": "TZ", "ceid": "TZ:sw",      "lang": "sw"},
+    {"iso": "GRC", "hl": "el",     "gl": "GR", "ceid": "GR:el",      "lang": "el"},
+    {"iso": "POL", "hl": "pl",     "gl": "PL", "ceid": "PL:pl",      "lang": "pl"},
+    {"iso": "ROU", "hl": "ro",     "gl": "RO", "ceid": "RO:ro",      "lang": "ro"},
+    {"iso": "SRB", "hl": "sr",     "gl": "RS", "ceid": "RS:sr",      "lang": "sr"},
+    {"iso": "SWE", "hl": "sv",     "gl": "SE", "ceid": "SE:sv",      "lang": "sv"},
+    {"iso": "THA", "hl": "th",     "gl": "TH", "ceid": "TH:th",      "lang": "th"},
+    {"iso": "VNM", "hl": "vi",     "gl": "VN", "ceid": "VN:vi",      "lang": "vi"},
+    {"iso": "ISR", "hl": "he",     "gl": "IL", "ceid": "IL:he",      "lang": "he"}
   ],
+
+  "searches": [
+    {"q": "(\"state capture\" OR \"captured state\" OR \"criminal infiltration\") (cartel OR narco OR \"drug trafficking\" OR \"organised crime\" OR \"organized crime\")"},
+    {"q": "(OFAC OR Treasury OR sanctions) (\"drug trafficking\" OR narcotics OR cartel OR \"money laundering\") (designated OR blacklisted OR network)"},
+    {"q": "(port OR airport OR \"shipping line\" OR \"container terminal\") (cocaine OR \"drug trafficking\") (corruption OR insider OR bribed OR infiltrated)"},
+    {"q": "(bank OR \"financial institution\" OR \"crypto exchange\") (fined OR penalty OR \"deferred prosecution\") (\"money laundering\" OR \"drug proceeds\" OR cartel)"},
+    {"q": "(military OR army OR navy OR general OR colonel) (\"drug trafficking\" OR cocaine OR cartel) (convicted OR indicted OR complicity)"},
+    {"q": "(judge OR prosecutor OR magistrate) (bribe OR bribery OR corruption) (\"drug trafficking\" OR cartel OR narco)"},
+    {"q": "(mayor OR governor OR senator OR lawmaker OR minister OR president) (cartel OR narco OR \"drug trafficking\") (indicted OR convicted OR investigation)"},
+    {"q": "(captagon OR \"amphetamine smuggling\") (officials OR regime OR military OR customs OR network)"},
+    {"q": "(fentanyl OR \"precursor chemicals\") (company OR firm OR executives OR indicted OR sanctioned OR laundering)"},
+    {"q": "(casino OR junket OR \"underground banking\" OR hawala) (\"money laundering\" OR \"drug money\") (penalty OR investigation OR licence OR license)"},
+    {"q": "(Europol OR Eurojust OR Interpol) (\"drug trafficking\" OR \"money laundering\") (corruption OR official OR insider)"},
+    {"q": "(\"police corruption\" OR \"customs corruption\" OR \"prison corruption\") (drugs OR cocaine OR trafficking OR smuggling)"},
+    {"q": "(gold OR mining OR timber OR fishing) (\"money laundering\" OR cartel OR \"drug money\") (officials OR company OR sanctioned)"},
+    {"q": "(\"narco-state\" OR narcopolitics OR \"campaign financing\") (drug OR cartel OR trafficking)"},
+    {"q": "(extradited OR extradition) (\"drug trafficking\" OR cartel) (official OR officer OR politician OR general OR judge)"}
+  ],
+
   "feeds": [
-    {
-      "name": "InSight Crime",
-      "url": "https://insightcrime.org/feed/"
-    },
-    {
-      "name": "Global Initiative",
-      "url": "https://globalinitiative.net/feed/"
-    },
-    {
-      "name": "OCCRP",
-      "url": "https://www.occrp.org/en/feed"
-    },
-    {
-      "name": "UNODC",
-      "url": "https://www.unodc.org/unodc/en/frontpage/rss.xml"
-    },
-    {
-      "name": "Europol",
-      "url": "https://www.europol.europa.eu/newsroom/rss.xml"
-    },
-    {
-      "name": "FinCEN",
-      "url": "https://www.fincen.gov/news/rss.xml"
-    },
-    {
-      "name": "FATF",
-      "url": "https://www.fatf-gafi.org/en/rss.xml"
-    }
+    {"name": "InSight Crime",      "url": "https://insightcrime.org/feed/",                     "trusted": true},
+    {"name": "Global Initiative",  "url": "https://globalinitiative.net/feed/",                 "trusted": true},
+    {"name": "OCCRP",              "url": "https://www.occrp.org/en/feed",                      "trusted": true},
+    {"name": "ICIJ",               "url": "https://www.icij.org/feed/",                         "trusted": true},
+    {"name": "Bellingcat",         "url": "https://www.bellingcat.com/feed/",                   "trusted": true},
+    {"name": "Balkan Insight",     "url": "https://balkaninsight.com/feed/",                    "trusted": true},
+    {"name": "UNODC",              "url": "https://www.unodc.org/unodc/en/frontpage/rss.xml"},
+    {"name": "Europol",            "url": "https://www.europol.europa.eu/newsroom/rss.xml"},
+    {"name": "FATF",               "url": "https://www.fatf-gafi.org/en/rss.xml"},
+    {"name": "FinCEN",             "url": "https://www.fincen.gov/news/rss.xml",                "iso": "USA"},
+    {"name": "US DOJ",             "url": "https://www.justice.gov/feeds/opa/justice-news.xml", "iso": "USA"},
+    {"name": "US Treasury",        "url": "https://home.treasury.gov/rss/press.xml",            "iso": "USA"},
+    {"name": "Animal Político",    "url": "https://animalpolitico.com/feed",     "lang": "es",  "iso": "MEX"},
+    {"name": "Aristegui Noticias", "url": "https://aristeguinoticias.com/feed/", "lang": "es",  "iso": "MEX"},
+    {"name": "Agência Pública",    "url": "https://apublica.org/feed/",          "lang": "pt",  "iso": "BRA"},
+    {"name": "Premium Times",      "url": "https://www.premiumtimesng.com/feed",                "iso": "NGA"},
+    {"name": "Mail & Guardian",    "url": "https://mg.co.za/feed/",                             "iso": "ZAF"},
+    {"name": "Rappler",            "url": "https://www.rappler.com/feed/",                      "iso": "PHL"},
+    {"name": "Al Jazeera",         "url": "https://www.aljazeera.com/xml/rss/all.xml"}
   ]
 }

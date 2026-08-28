@@ -10,7 +10,10 @@
   "subregion": "",
   "snippet": "Funcionario judicial habría vendido dartos a narcos: detenido por cohecho, violación de secreto y lavado de activos 24horas",
   "lang": "es",
-  "sig": 8
+  "sig": 20,
+  "why": "capture",
+  "v": 2,
+  "subs": ""
  },
  {
   "title": "Zelenskyy Dismisses Senior Aide Suspected in $3.3 Million Money Laundering Case",
@@ -23,20 +26,10 @@
   "subregion": "Eastern Europe",
   "snippet": "Ukrainian investigators say senior officials and lawmakers used a state-owned bank and shell companies to launder criminal proceeds intended as bail in a separate corruption case. Iryna Mudra says investigators’ recordings were released in ",
   "lang": "en",
-  "sig": 13
- },
- {
-  "title": "Acción policial en la lucha contra el narcotráfico en \"Corrupción en Miami\" - Canal Sur",
-  "link": "https://news.google.com/rss/articles/CBMipAFBVV95cUxNQTVhTmV1TWpUekVtdXVoNk9Tcjcya3hRNkFUNWtkY19kTlZrMnZWMElJT2NadUlETHc1YU8zSlJrLXdCYWJLemNHT2Z3dk4xY293cHBxZU1laDdOMGRmSXE0TWQ0cjQ4YWc1UUZ1bC1hTml5SkY2R2hyZ2hsY1VXZGRrekhiYXRoWkcweDRHaEVtbXhXQTRhTzY2RHRya3dQQmh6OA?oc=5",
-  "date": "2026-08-17T07:00:00Z",
-  "source": "Canal Sur",
-  "iso": "USA",
-  "country": "United States",
-  "region": "Americas",
-  "subregion": "North America",
-  "snippet": "Acción policial en la lucha contra el narcotráfico en \"Corrupción en Miami\" Canal Sur",
-  "lang": "es",
-  "sig": 11
+  "sig": 20,
+  "why": "capture",
+  "v": 2,
+  "subs": "Eastern Europe"
  },
  {
   "title": "Condenan a banda policial por uno de los mayores casos de corrupción y narcotráfico en la Policía Bonaerense - andaragencia.org",
@@ -49,7 +42,10 @@
   "subregion": "",
   "snippet": "Condenan a banda policial por uno de los mayores casos de corrupción y narcotráfico en la Policía Bonaerense andaragencia.org",
   "lang": "es",
-  "sig": 13
+  "sig": 14,
+  "why": "capture",
+  "v": 2,
+  "subs": ""
  },
  {
   "title": "Alleged Irish Crime Boss Charged After UAE Extradition",
@@ -62,7 +58,10 @@
   "subregion": "Northern Europe",
   "snippet": "The alleged leader of a major Irish organized crime group was extradited from Dubai and charged with directing a criminal organization. Appearing without a lawyer, he told the court: “I think we know I won’t be getting bail.”",
   "lang": "en",
-  "sig": 10
+  "sig": 8,
+  "why": "role+outcome",
+  "v": 2,
+  "subs": "Northern Europe"
  },
  {
   "title": "Man linked to Toronto police corruption probe has global drug-trafficking ties, court documents say - CBC",
@@ -75,20 +74,10 @@
   "subregion": "North America",
   "snippet": "Man linked to Toronto police corruption probe has global drug-trafficking ties, court documents say CBC",
   "lang": "en",
-  "sig": 7
- },
- {
-  "title": "Head of FinCEN Leaving to Join Citibank as Global Head of Sanctions",
-  "link": "https://www.occrp.org/en/news/head-of-fincen-leaving-to-join-citibank",
-  "date": "2026-07-30T12:27:00Z",
-  "source": "OCCRP",
-  "iso": "",
-  "country": "",
-  "region": "",
-  "subregion": "",
-  "snippet": "Andrea Gacki has served as director of FinCEN since 2023. She’s the second top anti-money laundering regulator in the last five years to leave and join Citibank.",
-  "lang": "en",
-  "sig": 7
+  "sig": 12,
+  "why": "capture",
+  "v": 2,
+  "subs": "North America"
  },
  {
   "title": "Former Greenville police officer sentenced for drug trafficking scheme - SuperTalk Mississippi Media",
@@ -101,6 +90,9 @@
   "subregion": "",
   "snippet": "Former Greenville police officer sentenced for drug trafficking scheme SuperTalk Mississippi Media",
   "lang": "en",
-  "sig": 10
+  "sig": 8,
+  "why": "role+outcome",
+  "v": 2,
+  "subs": ""
  }
 ]
