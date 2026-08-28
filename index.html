@@ -559,8 +559,13 @@ body.info-open #controls #indexPanel{position:static !important;
     width:100% !important;max-width:100% !important;margin:0 !important;}
   #rundownPanel,#wireBox{position:static !important;width:100% !important;
     top:auto !important;left:auto !important;bottom:auto !important;max-height:none !important;}
+  /* Fallback caps only. fitPanels() measures the column at runtime and overrides these,
+     which is what lets a panel grow into the space a collapsed neighbour gave up. */
   #rundownPanel>.bx-body{max-height:38vh;}
   #wireBody{max-height:32vh;}
+  #sidebar>div,#rightbar>div{display:flex;flex-direction:column;}
+  #sidebar>div>.bx-head,#rightbar>div>.bx-head{flex:0 0 auto;}
+  #sidebar>div>.bx-body,#rightbar>div>.bx-body{flex:1 1 auto;min-height:0;}
 
   #indexPanel{position:static !important;left:auto !important;top:auto !important;
     right:auto !important;bottom:auto !important;width:100% !important;}
@@ -729,7 +734,14 @@ body.info-open #controls #indexPanel{position:static !important;
   #idxList .idx-row{padding:5px 8px;font-size:11.5px;color:#c3c8d6;cursor:pointer;border-radius:5px;
                     display:flex;justify-content:space-between;gap:8px;}
   #idxList .idx-row:hover{background:rgba(255,255,255,0.05);color:#fff;}
-  #idxList .idx-row b{font-family:'DejaVu Sans Mono',monospace;color:#e0b088;font-weight:400;}
+  #idxList .idx-row b{font-family:'DejaVu Sans Mono',monospace;color:#e0b088;font-weight:400;flex:none;}
+  #idxList .idx-row>span{min-width:0;}
+  #idxList .idx-nm{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #idxList .idx-sub{display:block;font-size:9.5px;color:#8b93ab;margin-top:1px;
+                    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #idxList .idx-tag{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;
+                    vertical-align:1px;flex:none;}
+  #idxList .idx-more{padding:6px 8px;font-size:10px;color:#8b93ab;font-style:italic;}
   #idxList .idx-grp>.idx-gh{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent-hi);
                             padding:8px 8px 4px;cursor:pointer;}
   .ctl-read{font-size:9.5px;line-height:1.5;color:#8f97ab;padding-bottom:9px;margin-bottom:9px;
@@ -795,12 +807,14 @@ body.info-open #controls #indexPanel{position:static !important;
     <div id="idxBody" class="bx-body">
       <div id="idxStatsBar"><span><b id="cSevere">0</b> severe</span><span><b id="cCases">0</b> cases</span><span><b id="cEnt">0</b> firms</span></div>
       <div id="idxControls">
-        <select id="idxSort" class="idxSel"><option value="score">Sort: score</option><option value="az">Sort: A &rarr; Z</option></select>
-        <select id="idxGroup" class="idxSel">
-          <option value="band">Group: exposure band</option>
-          <option value="cases">Group: has documented case</option>
-          <option value="none">Group: none</option>
+        <select id="idxMode" class="idxSel">
+          <option value="jur">List: jurisdictions</option>
+          <option value="off">List: officials &amp; state cases</option>
+          <option value="firm">List: companies &amp; firms</option>
+          <option value="grp">List: crime groups</option>
         </select>
+        <select id="idxSort" class="idxSel"></select>
+        <select id="idxGroup" class="idxSel"></select>
         <input id="idxSearch" type="text" placeholder="Filter&hellip;" autocomplete="off">
       </div>
       <div id="idxList"></div>
@@ -1123,6 +1137,22 @@ document.addEventListener('click',function(ev){
   }
   ev.stopPropagation();
 },true);
+/* One group popup, called from the marker and from the index panel. It was written
+   inline inside drawGroups, which left the index unable to open a group at all. */
+function openGroup(g){
+  var gt = GTMAP[g.ty];
+  var nt = (typeof g.note === 'number') ? NOTES[g.note] : null;
+  ptPopup(nt?420:320).setLatLng([g.lat,g.lng]).setContent(
+    '<div class="popup-country">'+g.n+'</div>'+
+    '<div class="ci-m">'+((gt&&gt.label)||'Organised-crime group')+' &middot; '+g.c+'</div>'+
+    (nt ? ('<div class="grp-note"><div class="gn-h">'+nt.title+(nt.where?(' &middot; '+nt.where):'')+'</div>'+
+           '<div class="ci-d">'+nt.d+'</div>'+
+           '<div class="ci-c">'+nt.cite+'</div></div>') : '')+
+    (g.geo ? ('<div class="geo-n"><b>Placed at:</b> '+g.geo+
+              (g.c0?(' &middot; country label corrected from '+g.c0):'')+'</div>') : '')+
+    '').openOn(map);
+}
+
 function openEntity(e){
   ptPopup(420).setLatLng([e.lat,e.lng]).setContent(
     '<div class="popup-country">'+e.n+'</div>'+entHTML(e,false)).openOn(map);
@@ -1175,19 +1205,7 @@ function drawGroups(){
         fillColor: tc, fillOpacity: 1,
         pane:'pts',renderer:R_PTS,bubblingMouseEvents:false});
     m.bindTooltip(g.n+' \u2014 '+g.c+((gt&&gt.label)?(' \u00b7 '+gt.label):''),{direction:'top',offset:[0,-4]});
-    m.on('click',function(e){
-      var nt = researched ? NOTES[g.note] : null;
-      ptPopup(nt?420:320).setLatLng([g.lat,g.lng]).setContent(
-        '<div class="popup-country">'+g.n+'</div>'+
-        '<div class="ci-m">'+((gt&&gt.label)||'Organised-crime group')+' &middot; '+g.c+'</div>'+
-        (nt ? ('<div class="grp-note"><div class="gn-h">'+nt.title+(nt.where?(' &middot; '+nt.where):'')+'</div>'+
-               '<div class="ci-d">'+nt.d+'</div>'+
-               '<div class="ci-c">'+nt.cite+'</div></div>') : '')+
-        (g.geo ? ('<div class="geo-n"><b>Placed at:</b> '+g.geo+
-                  (g.c0?(' &middot; country label corrected from '+g.c0):'')+'</div>') : '')+
-        '').openOn(map);
-      L.DomEvent.stop(e);
-    });
+    m.on('click',function(e){ openGroup(g); L.DomEvent.stop(e); });
     groupLayer.addLayer(m); declRegister(m,g.lat,g.lng,5,2);
   });
   groupLayer.addTo(map); declSoon();
@@ -1683,14 +1701,130 @@ function renderKeys(){
     NET_ON.routes=!NET_ON.routes; renderKeys(); drawRoutes();
   }, 1);
 }
-/* ---- index ---- */
+/* ---- index -------------------------------------------------------------------
+   The index used to list one thing: the 193 scored jurisdictions, ranked by the lens.
+   Every other layer on this map is a list too — the documented state cases, the firms,
+   the group inventory — and each has an order that means something. So the panel now
+   holds four lists, and each carries its own sort and grouping.
+
+     jurisdictions   ranked by the lens in force, as before
+     officials       ranked by how high the capture reached, then by how far the case got
+     firms           ranked by outcome, then by year
+     groups          ranked by the exposure of the jurisdiction they sit in
+
+   Rankings across lists are not comparable. A conviction and an OFAC designation are
+   different kinds of finding, and a group's position here is the score of the country
+   under it, not a measure of the group. */
+
+var IDX_MODE = 'jur';
+var IDX_MODES = {
+  jur: {
+    title: 'Jurisdictions',
+    sorts:  [['score','Sort: lens score'],['az','Sort: A \u2192 Z'],['recs','Sort: records held']],
+    groups: [['band','Group: exposure band'],['cases','Group: has documented case'],['none','Group: none']]
+  },
+  off: {
+    title: 'Officials',
+    sorts:  [['rank','Sort: office reached'],['status','Sort: how far it got'],
+             ['year','Sort: newest first'],['az','Sort: A \u2192 Z'],['country','Sort: jurisdiction']],
+    groups: [['bk','Group: office'],['status','Group: outcome'],
+             ['country','Group: jurisdiction'],['none','Group: none']]
+  },
+  firm: {
+    title: 'Firms',
+    sorts:  [['status','Sort: how far it got'],['year','Sort: newest first'],
+             ['az','Sort: A \u2192 Z'],['country','Sort: jurisdiction']],
+    groups: [['sector','Group: sector'],['status','Group: outcome'],
+             ['country','Group: jurisdiction'],['none','Group: none']]
+  },
+  grp: {
+    title: 'Groups',
+    sorts:  [['exp','Sort: host exposure'],['az','Sort: A \u2192 Z'],
+             ['country','Sort: jurisdiction'],['noted','Sort: researched first']],
+    groups: [['ty','Group: type'],['country','Group: jurisdiction'],['none','Group: none']]
+  }
+};
+var IDX_SORT  = {jur:'score', off:'rank', firm:'status', grp:'exp'};
+var IDX_GROUP = {jur:'band',  off:'bk',   firm:'sector', grp:'ty'};
+var IDX_MAX = 1400;         /* the whole group inventory fits; the cap is a floor under
+                               a future list, not a limit on this one */
+
+/* How far a case actually got. A designation is an executive finding and a conviction is
+   a court's, so they are ordered rather than pooled — the map's methodology says the same
+   thing about the two layers. */
+var STATUS_RANK = {convicted:7, settled:6, indicted:5, designated:5, investigation:3,
+                   inquiry:3, alleged:2, acquitted:1};
+var STATUS_LABEL = {convicted:'convicted', settled:'settled', indicted:'indicted',
+                    designated:'designated', investigation:'investigation',
+                    inquiry:'inquiry', alleged:'alleged', acquitted:'acquitted'};
+/* CASE_BUCKETS is ordered from the presidency downward, so its own index is the seniority
+   of the office the capture reached. */
+var BK_ORDER = {}; CASE_BUCKETS.forEach(function(p,i){ BK_ORDER[p[0]] = CASE_BUCKETS.length - i; });
+var BK_LABEL = {}; CASE_BUCKETS.forEach(function(p){ BK_LABEL[p[0]] = p[1]; });
+
+function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function statusOf(x){ return String(x&&x.status||'').toLowerCase(); }
+function statusVal(x){ return STATUS_RANK[statusOf(x)] || 0; }
+/* A group's country string is not always a row key — the inventory carries hyphenated and
+   territorial names. Unresolved ones rank last rather than being dropped. */
+function rowFor(name){ return ROWS[name] || ROWS[ALIAS[name]] || null; }
+function hostVal(name){ var r = rowFor(name); return r ? lensVal(r) : -1; }
+
+function _fillIdxSel(id, opts, current){
+  var el = document.getElementById(id); if(!el) return;
+  el.innerHTML = opts.map(function(o){
+    return '<option value="'+o[0]+'"'+(o[0]===current?' selected':'')+'>'+o[1]+'</option>';
+  }).join('');
+}
+function idxControls(){
+  var m = IDX_MODES[IDX_MODE];
+  _fillIdxSel('idxSort',  m.sorts,  IDX_SORT[IDX_MODE]);
+  _fillIdxSel('idxGroup', m.groups, IDX_GROUP[IDX_MODE]);
+}
+
+/* ---- rendering ---------------------------------------------------------------
+   Rows are written as one HTML string and clicks are taken by a single delegated
+   handler, because the group list is long enough that building a thousand elements and
+   binding a thousand handlers on every keystroke is felt. */
+var _idxRows = [];
+
+function idxSection(label, count, html){
+  return '<div class="idx-grp"><div class="idx-gh">'+esc(label)+' ('+count+')</div>'+html+'</div>';
+}
+function idxRow(i, tagColour, name, sub, fig){
+  return '<div class="idx-row" data-i="'+i+'">'+
+    '<span>'+
+      '<span class="idx-nm">'+(tagColour?('<span class="idx-tag" style="background:'+tagColour+'"></span>'):'')+esc(name)+'</span>'+
+      (sub?('<span class="idx-sub">'+esc(sub)+'</span>'):'')+
+    '</span><b>'+esc(fig)+'</b></div>';
+}
+
 function buildIndex(){
-  var q=(document.getElementById('idxSearch').value||'').toLowerCase();
-  var sort=document.getElementById('idxSort').value;
-  var grp=document.getElementById('idxGroup').value;
-  var keys=Object.keys(ROWS).filter(function(k){ return !q || k.toLowerCase().indexOf(q)>=0; });
+  var q   = (document.getElementById('idxSearch').value||'').toLowerCase();
+  var el  = document.getElementById('idxList');
+  var sort = document.getElementById('idxSort').value;
+  var grp  = document.getElementById('idxGroup').value;
+  IDX_SORT[IDX_MODE] = sort; IDX_GROUP[IDX_MODE] = grp;
+  _idxRows = [];
+  var out = (IDX_MODE === 'jur') ? idxJurisdictions(q, sort, grp)
+          : (IDX_MODE === 'off') ? idxRecords(CASES,    q, sort, grp, 'off')
+          : (IDX_MODE === 'firm')? idxRecords(ENTITIES, q, sort, grp, 'firm')
+          :                        idxGroups(q, sort, grp);
+  el.innerHTML = out.html || '<div class="idx-more">Nothing matches that filter.</div>';
+  document.getElementById('idxCount').textContent = out.n;
+  document.getElementById('idxTitle').firstChild.nodeValue = IDX_MODES[IDX_MODE].title + ' ';
+  document.getElementById('cSevere').textContent =
+    Object.keys(ROWS).filter(function(k){ return ROWS[k].exp>=7.5; }).length;
+  document.getElementById('cCases').textContent = CASES.length;
+}
+
+/* ---- 1. jurisdictions (the original list) ---- */
+function idxJurisdictions(q, sort, grp){
+  var keys = Object.keys(ROWS).filter(function(k){ return !q || k.toLowerCase().indexOf(q)>=0; });
+  function recs(k){ return (CASE_BY_C[k]||[]).length + (ENT_BY_C[k]||[]).length; }
   keys.sort(function(a,b){
-    if(sort==='az') return a.localeCompare(b);
+    if(sort==='az')   return a.localeCompare(b);
+    if(sort==='recs') return recs(b)-recs(a) || a.localeCompare(b);
     return lensVal(ROWS[b])-lensVal(ROWS[a]) || a.localeCompare(b);
   });
   var groups={};
@@ -1701,22 +1835,17 @@ function buildIndex(){
     (groups[g]=groups[g]||[]).push(k);
   });
   var order = grp==='band' ? BANDS.map(function(b){return b[0];}) : Object.keys(groups);
-  var el=document.getElementById('idxList'); el.innerHTML='';
+  var html='';
   order.forEach(function(g){
     if(!groups[g]) return;
-    var wrap=document.createElement('div'); wrap.className='idx-grp';
-    var gh=document.createElement('div'); gh.className='idx-gh';
-    gh.textContent=g+' ('+groups[g].length+')';
-    gh.onclick=function(){ wrap.classList.toggle('collapsed'); };
-    wrap.appendChild(gh);
+    var rows='';
     groups[g].forEach(function(k){
-      var row=document.createElement('div'); row.className='idx-row';
-      var dot=(CASE_BY_C[k]?' •':'')+(ENT_BY_C[k]&&ENTITIES.filter(function(e){return e.c===k&&SON[e.s];}).length?' ◆':'');
-      row.innerHTML='<span>'+k+dot+'</span><b>'+lensVal(ROWS[k]).toFixed(2)+'</b>';
-      row.onclick=function(){ flyTo(k); };
-      wrap.appendChild(row);
+      var i=_idxRows.length; _idxRows.push({kind:'jur', k:k});
+      var dot=(CASE_BY_C[k]?' \u2022':'')+
+              (ENT_BY_C[k]&&ENTITIES.filter(function(e){return e.c===k&&SON[e.s];}).length?' \u25c6':'');
+      rows+=idxRow(i, '', k+dot, '', lensVal(ROWS[k]).toFixed(2));
     });
-    el.appendChild(wrap);
+    html += idxSection(g, groups[g].length, rows);
   });
   /* jurisdictions carrying records but absent from the 193-state score set */
   var OFF=[]; ENTITIES.concat(CASES).forEach(function(r){
@@ -1724,34 +1853,148 @@ function buildIndex(){
   });
   OFF=OFF.filter(function(k){ return !q || k.toLowerCase().indexOf(q)>=0; }).sort();
   if(OFF.length){
-    var ow=document.createElement('div'); ow.className='idx-grp';
-    var oh=document.createElement('div'); oh.className='idx-gh';
-    oh.textContent='Outside the score set ('+OFF.length+')';
-    oh.onclick=function(){ ow.classList.toggle('collapsed'); };
-    ow.appendChild(oh);
+    var rows='';
     OFF.forEach(function(k){
       var recs=ENTITIES.filter(function(e){return e.c===k;}).concat(CASES.filter(function(c){return c.c===k;}));
-      var row=document.createElement('div'); row.className='idx-row';
+      var i=_idxRows.length; _idxRows.push({kind:'off-set', k:k, lat:recs[0].lat, lng:recs[0].lng, recs:recs});
       var dot=(CASES.filter(function(c){return c.c===k;}).length?' \u2022':'')+
               (ENTITIES.filter(function(e){return e.c===k&&SON[e.s];}).length?' \u25c6':'');
-      row.innerHTML='<span>'+k+dot+'</span><b>\u2014</b>';
-      row.onclick=function(){ openOffset(k, recs[0].lat, recs[0].lng); };
-      ow.appendChild(row);
+      rows+=idxRow(i, '', k+dot, '', '\u2014');
     });
-    el.appendChild(ow);
+    html += idxSection('Outside the score set', OFF.length, rows);
   }
-  document.getElementById('idxCount').textContent=keys.length+OFF.length;
-  document.getElementById('cSevere').textContent=Object.keys(ROWS).filter(function(k){return ROWS[k].exp>=7.5;}).length;
-  document.getElementById('cCases').textContent=CASES.length;
+  return {html:html, n:keys.length+OFF.length};
+}
+
+/* ---- 2 and 3. state cases and firms ---- */
+function idxRecords(list, q, sort, grp, kind){
+  var recs = list.filter(function(r){
+    if(!q) return true;
+    return (r.n+' '+r.c+' '+(r.rank||r.role||'')).toLowerCase().indexOf(q)>=0;
+  });
+  recs = recs.slice().sort(function(a,b){
+    if(sort==='az')      return a.n.localeCompare(b.n);
+    if(sort==='country') return a.c.localeCompare(b.c) || a.n.localeCompare(b.n);
+    if(sort==='year')    return (b.y||0)-(a.y||0) || a.n.localeCompare(b.n);
+    if(sort==='status')  return statusVal(b)-statusVal(a) || (b.y||0)-(a.y||0);
+    /* office reached, then how far the case got, then recency */
+    return (BK_ORDER[b.bk]||0)-(BK_ORDER[a.bk]||0) || statusVal(b)-statusVal(a) || (b.y||0)-(a.y||0);
+  });
+  var groups={}, order=[];
+  function bucket(r){
+    if(grp==='none')    return 'All';
+    if(grp==='status')  return STATUS_LABEL[statusOf(r)] || 'other';
+    if(grp==='country') return r.c;
+    return kind==='off' ? (BK_LABEL[r.bk]||'other') : ((SMAP[r.s]&&SMAP[r.s].label)||'other');
+  }
+  recs.forEach(function(r){
+    var g=bucket(r);
+    if(!groups[g]){ groups[g]=[]; order.push(g); }
+    groups[g].push(r);
+  });
+  if(grp==='bk')     order = CASE_BUCKETS.map(function(p){return p[1];}).filter(function(l){return groups[l];});
+  if(grp==='sector') order = SECTORS.map(function(s){return s.label;}).filter(function(l){return groups[l];});
+  if(grp==='status') order.sort(function(a,b){ return (STATUS_RANK[b]||0)-(STATUS_RANK[a]||0); });
+  if(grp==='country')order.sort();
+
+  var html='';
+  order.forEach(function(g){
+    var rows='';
+    groups[g].forEach(function(r){
+      var i=_idxRows.length; _idxRows.push({kind:kind, r:r});
+      var colour = kind==='off' ? (BUCKET_OF[r.bk]||'#f6288f')
+                                : ((SMAP[r.s]&&SMAP[r.s].accent)||'#f15622');
+      var sub = r.c + ' \u00b7 ' + (STATUS_LABEL[statusOf(r)]||statusOf(r)) +
+                (r.rank ? (' \u00b7 '+r.rank) : (r.role ? (' \u00b7 '+r.role) : ''));
+      rows += idxRow(i, colour, r.n, sub, r.y||'\u2014');
+    });
+    html += idxSection(g, groups[g].length, rows);
+  });
+  return {html:html, n:recs.length};
+}
+
+/* ---- 4. the group inventory ---- */
+function idxGroups(q, sort, grp){
+  var gs = GROUPS.filter(function(g){
+    if(!q) return true;
+    return (g.n+' '+g.c+' '+(g.geo||'')).toLowerCase().indexOf(q)>=0;
+  });
+  gs = gs.slice().sort(function(a,b){
+    if(sort==='az')      return a.n.localeCompare(b.n);
+    if(sort==='country') return a.c.localeCompare(b.c) || a.n.localeCompare(b.n);
+    if(sort==='noted')   return (typeof b.note==='number')-(typeof a.note==='number') ||
+                                hostVal(b.c)-hostVal(a.c) || a.n.localeCompare(b.n);
+    return hostVal(b.c)-hostVal(a.c) || a.n.localeCompare(b.n);
+  });
+  var groups={}, order=[];
+  gs.forEach(function(g){
+    var k = grp==='none' ? 'All'
+          : grp==='country' ? g.c
+          : ((GTMAP[g.ty]&&GTMAP[g.ty].label) || 'unclassified');
+    if(!groups[k]){ groups[k]=[]; order.push(k); }
+    groups[k].push(g);
+  });
+  if(grp==='ty')      order = GTYPES.map(function(t){return t.label;}).filter(function(l){return groups[l];})
+                                    .concat(groups['unclassified']?['unclassified']:[]);
+  if(grp==='country') order.sort();
+
+  var html='', drawn=0;
+  order.forEach(function(k){
+    var rows='', shown=0;
+    groups[k].forEach(function(g){
+      if(drawn>=IDX_MAX) return;
+      var i=_idxRows.length; _idxRows.push({kind:'grp', g:g});
+      var gt = GTMAP[g.ty];
+      var host = hostVal(g.c);
+      rows += idxRow(i, (gt&&gt.accent)||'#b3182f', g.n,
+                     g.c + (g.geo?(' \u00b7 '+g.geo):''),
+                     host>=0 ? host.toFixed(2) : '\u2014');
+      drawn++; shown++;
+    });
+    if(shown) html += idxSection(k, groups[k].length, rows);
+  });
+  if(drawn < gs.length){
+    html += '<div class="idx-more">'+(gs.length-drawn)+' more not drawn \u2014 filter to reach them. '+
+            'The figure is the exposure score of the jurisdiction the group sits in, not a measure of the group.</div>';
+  }
+  return {html:html, n:gs.length};
+}
+
+/* ---- opening a row ---- */
+function idxGoto(lat, lng, then){
+  var z = Math.max(map.getZoom(), 5);
+  map.once('moveend', function(){ then(); });
+  map.setView([lat,lng], z, {animate:true});
 }
 function flyTo(k){
   activeIso=k;
   focusCountry(k, function(){ openCountryPopup(k); });
 }
-['idxSearch','idxSort','idxGroup'].forEach(function(id){
-  document.getElementById(id).addEventListener('input',buildIndex);
+document.getElementById('idxList').addEventListener('click', function(e){
+  var row = e.target.closest ? e.target.closest('.idx-row') : null;
+  if(!row) return;
+  var rec = _idxRows[parseInt(row.getAttribute('data-i'),10)];
+  if(!rec) return;
+  if(rec.kind==='jur')      flyTo(rec.k);
+  else if(rec.kind==='off-set') openOffset(rec.k, rec.lat, rec.lng);
+  else if(rec.kind==='off')  idxGoto(rec.r.lat, rec.r.lng, function(){ openCase(rec.r); });
+  else if(rec.kind==='firm') idxGoto(rec.r.lat, rec.r.lng, function(){ openEntity(rec.r); });
+  else if(rec.kind==='grp')  idxGoto(rec.g.lat, rec.g.lng, function(){ openGroup(rec.g); });
+});
+
+document.getElementById('idxMode').addEventListener('change', function(){
+  IDX_MODE = this.value; idxControls(); buildIndex();
+});
+/* The group list is 1,179 rows. Rebuilding it on every keystroke is visible, so the
+   filter box waits for a pause; the selects rebuild at once, since a click is a decision. */
+var _idxT=null;
+document.getElementById('idxSearch').addEventListener('input',function(){
+  clearTimeout(_idxT); _idxT=setTimeout(buildIndex, 130);
+});
+['idxSort','idxGroup'].forEach(function(id){
   document.getElementById(id).addEventListener('change',buildIndex);
 });
+idxControls();
 
 
 /* ---- live wire ----------------------------------------------------------------
@@ -1953,7 +2196,7 @@ function renderMethod(){
   var n=Object.keys(ROWS).length, sev=Object.keys(ROWS).filter(function(k){return ROWS[k].exp>=7.5;}).length;
   var seaSev=Object.keys(ROWS).filter(function(k){return ROWS[k].sea>=7.5;}).length;
   var h='';
-  h+='<div class="m-p">Five layers, different epistemic status. Keep them apart when citing.</div>';
+  h+='<div class="m-p">Five layers, different epistemic status. Keep them apart when citing. The index panel lists four of them separately &mdash; jurisdictions by the lens in force, state cases by the office the capture reached, firms by outcome, and the group inventory by the exposure of the jurisdiction each group sits in. Those orders are internal to each list: a conviction and a designation are different kinds of finding, and a group&rsquo;s position is the score of the country under it rather than a measure of the group.</div>';
 
   h+='<div class="m-h">Layer 1 &mdash; exposure score, '+n+' countries</div>';
   h+='<div class="m-p">Source: the Global Organized Crime Index 2025, published by the Global Initiative Against Transnational Organized Crime, covering 193 UN member states. Six indicators are transcribed from the public rankings tables at ocindex.net: <b>state-embedded actors</b>, and all four drug markets &mdash; <b>cocaine</b>, <b>synthetic drugs</b>, <b>heroin</b>, <b>cannabis</b> &mdash; plus overall <b>criminality</b> and <b>resilience</b> for context. All are 1&ndash;10, expert-assessed.</div>';
@@ -2020,8 +2263,126 @@ document.querySelectorAll('.bx-head').forEach(function(hd){
     if(ev.target && ev.target.id==='wireRefresh') return;
     var box=hd.parentNode, c=box.classList.toggle('collapsed');
     var t=hd.querySelector('.bx-tog'); if(t) t.innerHTML=c?'+':'\u2212';
+    fitPanels();          /* the boxes below take the space this one just gave up */
   });
 });
+/* ---- column fitting -----------------------------------------------------------
+   The two side columns are flex stacks, and each panel body carried a fixed cap in vh:
+   the rundown 38, the wire 32, the key 54, the index 36. Those caps are what made a
+   collapse look wrong. The boxes underneath moved up, because that is what a flex column
+   does, but they kept the height their cap gave them, so the space the collapsed box gave
+   up appeared as a gap at the bottom of the column instead of going to anyone.
+
+   The caps are replaced by a measurement. Each open panel asks for the height its content
+   actually wants; the column shares out what it has by filling the smallest request
+   first, so a short panel is never stretched past its content and the surplus goes to the
+   panels that can use it. Collapse a box and the rest grow into it; open it again and
+   they give the space back.
+
+   The split is done in one pure function so it can be tested without a browser. */
+
+/* Water-filling. Returns one allowance per request, summing to at most `avail`:
+   every panel gets what it asks for if everything fits, and otherwise the smallest
+   requests are satisfied first and the remainder is split evenly among the rest. */
+function _fitShare(avail, needs, floor){
+  floor = floor || 0;
+  var out = needs.slice(), left = avail, open = [];
+  needs.forEach(function(n,i){ if(n>0) open.push(i); else out[i]=0; });
+  if(!open.length) return out;
+  open.forEach(function(i){ out[i] = 0; });
+  var pool = open.slice();
+  while(pool.length){
+    var share = left / pool.length, done = false;
+    for(var j=0;j<pool.length;j++){
+      var i = pool[j];
+      if(needs[i] <= share){                 /* asks for less than its share: give it all */
+        out[i] = needs[i]; left -= needs[i];
+        pool.splice(j,1); done = true; break;
+      }
+    }
+    if(done) continue;
+    pool.forEach(function(i){ out[i] = Math.max(floor, left/pool.length); });
+    break;
+  }
+  return out;
+}
+
+/* The height a body would take with nothing clipped. A body can hold its own scroller —
+   #idxList is one — and that child's overflow has to be counted or the panel understates
+   what it wants and never grows. */
+function _naturalHeight(body){
+  var h = body.scrollHeight;
+  /* Only the first two levels are inspected. The index list holds over a thousand rows,
+     and reading a computed style for every one of them on each refit was slower than the
+     layout it was measuring; the scrollers that matter are always shallow. */
+  var lvl1 = [].slice.call(body.children);
+  var scan = lvl1.concat.apply(lvl1, lvl1.map(function(c){ return [].slice.call(c.children); }));
+  scan.forEach(function(el){
+    var ov = getComputedStyle(el).overflowY;
+    if((ov==='auto'||ov==='scroll') && el.scrollHeight > el.clientHeight)
+      h += el.scrollHeight - el.clientHeight;
+  });
+  return h;
+}
+
+var FIT_COLS = ['sidebar','rightbar'], FIT_MIN = 92;
+
+function fitColumn(col){
+  if(!col || !col.offsetParent && col.offsetHeight===0) return;
+  var panels = [].slice.call(col.children).filter(function(p){
+    return p.offsetParent !== null || p.offsetHeight > 0;
+  });
+  if(!panels.length) return;
+
+  var top = col.getBoundingClientRect().top;
+  var gap = parseFloat(getComputedStyle(col).rowGap || getComputedStyle(col).gap) || 9;
+  var avail = window.innerHeight - top - 16 - gap*(panels.length-1);
+
+  var bodies = [], heads = 0, needs = [];
+  panels.forEach(function(p){
+    var head = p.querySelector('.bx-head');
+    var body = p.querySelector('.bx-body');
+    heads += head ? head.offsetHeight : 0;
+    if(body) body.style.removeProperty('max-height');   /* measure unclipped, and never
+                                                          leave a collapsed box holding a
+                                                          cap it would reopen into */
+    if(!body || p.classList.contains('collapsed')){ bodies.push(null); needs.push(0); return; }
+    bodies.push(body);
+    needs.push(_naturalHeight(body));
+  });
+  var room = Math.max(0, avail - heads);
+  var give = _fitShare(room, needs, FIT_MIN);
+  bodies.forEach(function(b,i){
+    if(!b) return;
+    b.style.setProperty('max-height', Math.round(give[i])+'px', 'important');
+  });
+}
+
+var _fitT = null;
+function fitPanels(){
+  clearTimeout(_fitT);
+  _fitT = setTimeout(function(){
+    FIT_COLS.forEach(function(id){ fitColumn(document.getElementById(id)); });
+  }, 16);
+}
+
+/* Anything that changes what a panel holds changes what it wants, so the fit runs on
+   content as well as on collapse: the wire arriving, the index rebuilding, the key being
+   drawn, a group being folded open. One observer per column covers all of it. */
+(function(){
+  window.addEventListener('resize', fitPanels);
+  FIT_COLS.forEach(function(id){
+    var col = document.getElementById(id); if(!col) return;
+    col.addEventListener('click', fitPanels);          /* collapse, folds, list toggles */
+    if(window.MutationObserver){
+      new MutationObserver(fitPanels).observe(col, {childList:true, subtree:true});
+    }
+  });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitPanels);
+  window.addEventListener('load', fitPanels);
+  fitPanels();
+})();
+
 (function(){
   var h=document.getElementById('methodSubHead'), mb=document.getElementById('methodBody');
   if(!h||!mb) return;
