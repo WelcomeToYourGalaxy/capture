@@ -2,7 +2,7 @@ name: harvest wire
 
 on:
   schedule:
-    - cron: "17 */3 * * *"      # every three hours
+    - cron: "17 */2 * * *"      # every two hours
   workflow_dispatch:
 
 permissions:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   harvest:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
