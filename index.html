@@ -947,9 +947,13 @@ var BAND_ON=[true,true,true,true,true];   /* severe .. minimal */
 var CASE_ON=true;
 var CASE_BY_C = {}; CASES.forEach(function(c){ (CASE_BY_C[c.c]=CASE_BY_C[c.c]||[]).push(c); });
 
-var WORLD_BOUNDS = L.latLngBounds([[-89,-215],[89,215]]);
+/* No maxBounds. Viscosity at 0 lets a drag leave the bound but does not stop
+   Leaflet panning back inside it when the drag ends, and that pan is the snap
+   back to centre. Without the bound a drag ends where it is let go; minZoom
+   still stops the world shrinking away. */
+var WORLD_BOUNDS = null;
 var map = L.map('map',{center:[18,-20],zoom:3,minZoom:1,maxZoom:14,
-                       worldCopyJump:false, maxBounds:WORLD_BOUNDS, maxBoundsViscosity:0,
+                       worldCopyJump:false,
                        zoomControl:true,attributionControl:true});
 map.attributionControl.addAttribution('Scores: GI-TOC Organized Crime Index 2025 · Boundaries: Natural Earth / geoBoundaries');
 
